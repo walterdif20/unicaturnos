@@ -55,6 +55,7 @@ function App() {
   const [schedules, setSchedules] = useState({});
   const [holidays, setHolidays] = useState([]);
   const [bookingsByCourtHour, setBookingsByCourtHour] = useState({});
+  const [adminBookings, setAdminBookings] = useState([]);
   const [myBookings, setMyBookings] = useState([]);
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = toLocalDate(new Date());
@@ -140,6 +141,12 @@ function App() {
       bookedMap[`${data.courtId}-${data.hour}`] = { id: booking.id, ...data };
     });
     setBookingsByCourtHour(bookedMap);
+
+    const allBookingsSnapshot = await getDocs(collection(db, 'bookings'));
+    const allBookings = allBookingsSnapshot.docs
+      .map((booking) => ({ id: booking.id, ...booking.data() }))
+      .sort((a, b) => `${a.date || ''}-${a.hour || 0}`.localeCompare(`${b.date || ''}-${b.hour || 0}`));
+    setAdminBookings(allBookings);
   };
 
   useEffect(() => {
@@ -427,6 +434,7 @@ function App() {
             onSaveScheduleHour={saveScheduleHour}
             onAddHoliday={addHoliday}
             onRemoveHoliday={removeHoliday}
+            adminBookings={adminBookings}
           />
         )}
       </main>
