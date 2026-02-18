@@ -121,6 +121,8 @@ function App() {
 
   const loginWithGoogle = async () => {
     setAuthError('');
+    setAuthLoading(true);
+
     try {
       await signInWithPopup(auth, googleProvider);
       setStatusMessage('Sesión iniciada correctamente.');
