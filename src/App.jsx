@@ -107,6 +107,7 @@ function App() {
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [manualBookingData, setManualBookingData] = useState(emptyManualBooking);
   const [editingProfile, setEditingProfile] = useState(false);
+  const canAccessAdmin = Boolean(profile?.isAdmin);
 
   const requestConfirmation = (message) => {
     if (typeof window === 'undefined') return true;
