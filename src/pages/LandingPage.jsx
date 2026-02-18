@@ -3,13 +3,16 @@ import { DEFAULT_DAYS } from '../constants';
 import { formatLongDate } from '../utils/date';
 
 function LandingPage({
+  user,
   selectedDate,
   upcomingDates,
   holidays,
   slotsByCourt,
   bookingsByCourtHour,
   onChangeDate,
-  onBookSlot
+  onBookSlot,
+  onGoLogin,
+  onGoRegister
 }) {
   const selectedDateIndex = upcomingDates.indexOf(selectedDate);
   const canGoPrev = selectedDateIndex > 0;
@@ -20,11 +23,25 @@ function LandingPage({
   return (
     <section className="card landing-card">
       <img src={complejo} alt="Complejo La Única" className="banner" />
-      <h2>Disponibilidad por cancha</h2>
-      <p className="date-title">{formatLongDate(selectedDate)}</p>
+      <div className="landing-topbar">
+        <div>
+          <h2>Disponibilidad por cancha</h2>
+          <p className="date-title">{formatLongDate(selectedDate)}</p>
+        </div>
+        {!user && (
+          <div className="landing-actions">
+            <button type="button" className="btn-secondary" onClick={onGoLogin}>
+              Iniciar sesión
+            </button>
+            <button type="button" onClick={onGoRegister}>
+              Registrarse
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="week-nav">
-        <button type="button" onClick={() => onChangeDate(upcomingDates[selectedDateIndex - 1])} disabled={!canGoPrev}>
+        <button type="button" className="btn-secondary" onClick={() => onChangeDate(upcomingDates[selectedDateIndex - 1])} disabled={!canGoPrev}>
           ← Día anterior
         </button>
         <div className="week-chips" role="tablist" aria-label="Próximos siete días">
@@ -41,7 +58,7 @@ function LandingPage({
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => onChangeDate(upcomingDates[selectedDateIndex + 1])} disabled={!canGoNext}>
+        <button type="button" className="btn-secondary" onClick={() => onChangeDate(upcomingDates[selectedDateIndex + 1])} disabled={!canGoNext}>
           Día siguiente →
         </button>
       </div>
