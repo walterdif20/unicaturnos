@@ -33,9 +33,16 @@ const getHours = (scheduleForDay) => {
   return Array.from({ length: close - open }, (_, idx) => open + idx);
 };
 
+const buildPhone = ({ countryCode, areaCode, phoneNumber }) =>
+  `+${countryCode.trim()} ${areaCode.trim()} ${phoneNumber.trim()}`.replace(/\s+/g, ' ').trim();
+
+const isProfileComplete = (profile) => Boolean(profile?.firstName && profile?.lastName && profile?.phone);
+
 function App() {
   const upcomingDates = useMemo(() => buildUpcomingDates(7), []);
   const [activeSection, setActiveSection] = useState('landing');
+  const [authView, setAuthView] = useState('login');
+  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [courts, setCourts] = useState([]);
@@ -58,11 +65,33 @@ function App() {
       setUser(authUser);
       if (!authUser) {
         setProfile(null);
+        setLoading(false);
         return;
       }
-      const userDoc = await getDoc(doc(db, 'users', authUser.uid));
-      if (userDoc.exists()) {
-        setProfile(userDoc.data());
+
+      try {
+        const userRef = doc(db, 'users', authUser.uid);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+          setProfile(userDoc.data());
+        } else {
+          setProfile({
+            firstName: '',
+            lastName: '',
+            email: authUser.email || '',
+            phone: ''
+          });
+        }
+      } catch {
+        setProfile({
+          firstName: '',
+          lastName: '',
+          email: authUser.email || '',
+          phone: ''
+        });
+        setAuthError('Sesión iniciada, pero no se pudo leer tu perfil de Firestore. Revisá reglas/permisos.');
+      } finally {
+        setLoading(false);
       }
     });
 
@@ -100,45 +129,98 @@ function App() {
     loadCoreData(selectedDate);
   }, [selectedDate]);
 
+  useEffect(() => {
+    if (user && !isProfileComplete(profile)) {
+      setActiveSection('registro');
+      setAuthView('register');
+    }
+  }, [user, profile]);
+
   const registerUser = async (event) => {
     event.preventDefault();
     setAuthError('');
+
+    if (!registerData.countryCode || !registerData.areaCode || !registerData.phoneNumber) {
+      setAuthError('Completá código de país, código de área y número de teléfono.');
+      return;
+    }
+
     try {
-      const cred = await createUserWithEmailAndPassword(auth, registerData.email, registerData.password);
-      await setDoc(doc(db, 'users', cred.user.uid), {
-        firstName: registerData.firstName,
-        lastName: registerData.lastName,
-        phone: registerData.phone,
-        email: registerData.email
-      });
+      const created = await createUserWithEmailAndPassword(auth, registerData.email, registerData.password);
+      const payload = {
+        firstName: registerData.firstName.trim(),
+        lastName: registerData.lastName.trim(),
+        phone: buildPhone(registerData),
+        email: registerData.email.trim()
+      };
+      await setDoc(doc(db, 'users', created.user.uid), payload, { merge: true });
+      setProfile(payload);
       setRegisterData(emptyRegister);
       setStatusMessage('Registro exitoso. Ya podés reservar tu turno.');
+      setActiveSection('landing');
     } catch {
-      setAuthError('No se pudo registrar. Revisá los datos ingresados.');
+      setAuthError('No se pudo registrar. Revisá email/contraseña e intentá nuevamente.');
     }
   };
 
   const loginUser = async (event) => {
     event.preventDefault();
     setAuthError('');
+
     try {
       await signInWithEmailAndPassword(auth, loginData.email, loginData.password);
       setLoginData(emptyLogin);
+      setStatusMessage('Sesión iniciada correctamente.');
+      setActiveSection('landing');
     } catch {
       setAuthError('Credenciales inválidas.');
     }
   };
 
+  const saveProfile = async (event) => {
+    event.preventDefault();
+    if (!user) return;
+
+    setAuthError('');
+    if (!registerData.countryCode || !registerData.areaCode || !registerData.phoneNumber) {
+      setAuthError('Completá código de país, código de área y número de teléfono.');
+      return;
+    }
+
+    try {
+      const payload = {
+        firstName: registerData.firstName.trim(),
+        lastName: registerData.lastName.trim(),
+        phone: buildPhone(registerData),
+        email: user.email || profile?.email || ''
+      };
+      await setDoc(doc(db, 'users', user.uid), payload, { merge: true });
+      setProfile(payload);
+      setRegisterData(emptyRegister);
+      setStatusMessage('Perfil guardado. Ya podés reservar tu turno.');
+      setActiveSection('landing');
+    } catch {
+      setAuthError('No se pudo guardar tu perfil.');
+    }
+  };
+
   const logoutUser = async () => {
     await signOut(auth);
+    setStatusMessage('Sesión cerrada.');
+  };
+
+  const goToAuth = (mode) => {
+    setAuthView(mode);
+    setActiveSection('registro');
   };
 
   const bookSlot = async (courtId, hour) => {
-    if (!user) {
-      setStatusMessage('Necesitás iniciar sesión para reservar.');
-      setActiveSection('registro');
+    if (!user || !isProfileComplete(profile)) {
+      setStatusMessage('Necesitás iniciar sesión y completar tus datos para reservar.');
+      goToAuth(user ? 'register' : 'login');
       return;
     }
+
     const slotKey = `${courtId}-${hour}`;
     if (bookingsByCourtHour[slotKey]) return;
 
@@ -212,14 +294,29 @@ function App() {
     [courts, schedules, dayIndex]
   );
 
+  const profileDraft = {
+    firstName: registerData.firstName || profile?.firstName || '',
+    lastName: registerData.lastName || profile?.lastName || '',
+    countryCode: registerData.countryCode,
+    areaCode: registerData.areaCode,
+    phoneNumber: registerData.phoneNumber
+  };
+
   return (
     <div className="app">
       <Header />
       <MainNav activeSection={activeSection} onChangeSection={setActiveSection} />
 
       <main>
-        {activeSection === 'landing' && (
+        {loading ? (
+          <section className="card">
+            <p>Cargando datos...</p>
+          </section>
+        ) : null}
+
+        {!loading && activeSection === 'landing' && (
           <LandingPage
+            user={user}
             selectedDate={selectedDate}
             upcomingDates={upcomingDates}
             holidays={holidays}
@@ -227,25 +324,33 @@ function App() {
             bookingsByCourtHour={bookingsByCourtHour}
             onChangeDate={setSelectedDate}
             onBookSlot={bookSlot}
+            onGoLogin={() => goToAuth('login')}
+            onGoRegister={() => goToAuth('register')}
           />
         )}
 
-        {activeSection === 'registro' && (
+        {!loading && activeSection === 'registro' && (
           <AuthPage
             user={user}
             profile={profile}
+            profileDraft={profileDraft}
+            authView={authView}
             authError={authError}
             loginData={loginData}
             registerData={registerData}
+            onChangeAuthView={setAuthView}
             onChangeLogin={(field, value) => setLoginData((prev) => ({ ...prev, [field]: value }))}
             onChangeRegister={(field, value) => setRegisterData((prev) => ({ ...prev, [field]: value }))}
+            onChangeProfileDraft={(field, value) => setRegisterData((prev) => ({ ...prev, [field]: value }))}
             onLogin={loginUser}
             onRegister={registerUser}
+            onSaveProfile={saveProfile}
             onLogout={logoutUser}
+            profileComplete={isProfileComplete(profile)}
           />
         )}
 
-        {activeSection === 'admin' && (
+        {!loading && activeSection === 'admin' && (
           <AdminPage
             courts={courts}
             schedules={schedules}
