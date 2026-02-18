@@ -43,6 +43,12 @@ const getHours = (scheduleForDay) => {
 const buildPhone = ({ countryCode, areaCode, phoneNumber }) =>
   `+${countryCode.trim()} ${areaCode.trim()} ${phoneNumber.trim()}`.replace(/\s+/g, ' ').trim();
 
+const phoneAlreadyExists = async (phone) => {
+  const duplicatedPhoneQuery = query(collection(db, 'users'), where('phone', '==', phone));
+  const duplicatedPhoneSnapshot = await getDocs(duplicatedPhoneQuery);
+  return !duplicatedPhoneSnapshot.empty;
+};
+
 const parsePhone = (phone = '') => {
   const normalizedPhone = phone.trim().replace(/\s+/g, ' ');
   const parts = normalizedPhone.split(' ').filter(Boolean);
@@ -282,11 +288,18 @@ function App() {
     setAuthLoading(true);
 
     try {
+      const phone = buildPhone(registerData);
+
+      if (await phoneAlreadyExists(phone)) {
+        setAuthError('Ese teléfono ya está registrado. Usá otro número o iniciá sesión.');
+        return;
+      }
+
       const credentials = await createUserWithEmailAndPassword(auth, registerData.email, registerData.password);
       const payload = {
         firstName: registerData.firstName.trim(),
         lastName: registerData.lastName.trim(),
-        phone: buildPhone(registerData),
+        phone,
         email: registerData.email.trim()
       };
 
