@@ -19,7 +19,6 @@ function AuthPage({
   return (
     <section className="card auth-card">
       <h2>Cuenta</h2>
-
       {!user && (
         <div className="auth-flow">
           <div className="auth-switch">
