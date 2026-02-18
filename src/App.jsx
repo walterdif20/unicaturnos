@@ -86,6 +86,12 @@ function App() {
   const [selectedRoleUser, setSelectedRoleUser] = useState(null);
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [manualBookingData, setManualBookingData] = useState(emptyManualBooking);
+  const canAccessAdmin = Boolean(user && profile?.isAdmin);
+
+  const requestConfirmation = (message) => {
+    if (typeof window === 'undefined') return true;
+    return window.confirm(message);
+  };
 
   const requestConfirmation = (message) => {
     if (typeof window === 'undefined') return true;
@@ -204,6 +210,12 @@ function App() {
       setAuthView('register');
     }
   }, [user, profile]);
+
+  useEffect(() => {
+    if (!canAccessAdmin && activeSection === 'admin') {
+      setActiveSection('landing');
+    }
+  }, [activeSection, canAccessAdmin]);
 
   const goToAuth = (mode) => {
     setAuthView(mode);
@@ -648,7 +660,7 @@ function App() {
   return (
     <div className="app">
       <Header />
-      <MainNav activeSection={activeSection} onChangeSection={setActiveSection} />
+      <MainNav activeSection={activeSection} onChangeSection={setActiveSection} canAccessAdmin={canAccessAdmin} />
 
       <main>
         {loading ? (
@@ -726,7 +738,7 @@ function App() {
           />
         )}
 
-        {!loading && activeSection === 'admin' && (
+        {!loading && canAccessAdmin && activeSection === 'admin' && (
           <AdminPage
             courts={courts}
             schedules={schedules}
