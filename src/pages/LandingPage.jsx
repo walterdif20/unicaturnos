@@ -12,7 +12,8 @@ function LandingPage({
   onChangeDate,
   onBookSlot,
   onGoLogin,
-  onGoRegister
+  onGoRegister,
+  bookingInProgress
 }) {
   const selectedDateIndex = upcomingDates.indexOf(selectedDate);
   const canGoPrev = selectedDateIndex > 0;
@@ -78,7 +79,7 @@ function LandingPage({
                   <button
                     key={slotKey}
                     type="button"
-                    disabled={Boolean(booked)}
+                    disabled={Boolean(booked) || bookingInProgress}
                     className={booked ? 'slot slot-booked' : 'slot slot-open'}
                     onClick={() => onBookSlot(court.id, hour)}
                   >

@@ -15,6 +15,7 @@ import {
   getDoc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   where
@@ -75,6 +76,7 @@ function App() {
   const [adminUsers, setAdminUsers] = useState([]);
   const [roleSearch, setRoleSearch] = useState('');
   const [selectedRoleUser, setSelectedRoleUser] = useState(null);
+  const [bookingInProgress, setBookingInProgress] = useState(false);
 
   const loadMyBookings = async (uid) => {
     if (!uid) {
@@ -284,6 +286,8 @@ function App() {
   };
 
   const bookSlot = async (courtId, hour) => {
+    if (bookingInProgress) return;
+
     if (!user || !isProfileComplete(profile)) {
       setStatusMessage('Necesitás iniciar sesión y completar tus datos para reservar.');
       goToAuth(user ? 'register' : 'login');
@@ -305,20 +309,47 @@ function App() {
       return;
     }
 
-    await addDoc(collection(db, 'bookings'), {
-      courtId,
-      hour,
-      date: selectedDate,
-      userId: user.uid,
-      userName: `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim(),
-      userPhone: profile?.phone || '',
-      status: 'reservado',
-      confirmationToken: buildConfirmationToken(),
-      createdAt: serverTimestamp()
-    });
+    setBookingInProgress(true);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const sameSlotQuery = query(
+          collection(db, 'bookings'),
+          where('date', '==', selectedDate),
+          where('courtId', '==', courtId),
+          where('hour', '==', hour)
+        );
+        const sameSlotSnapshot = await transaction.get(sameSlotQuery);
 
-    setStatusMessage(`Turno reservado para las ${hour}:00.`);
-    await Promise.all([loadCoreData(selectedDate), loadMyBookings(user.uid)]);
+        if (!sameSlotSnapshot.empty) {
+          throw new Error('SLOT_ALREADY_BOOKED');
+        }
+
+        const bookingRef = doc(collection(db, 'bookings'));
+        transaction.set(bookingRef, {
+          courtId,
+          hour,
+          date: selectedDate,
+          userId: user.uid,
+          userName: `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim(),
+          userPhone: profile?.phone || '',
+          status: 'reservado',
+          confirmationToken: buildConfirmationToken(),
+          createdAt: serverTimestamp()
+        });
+      });
+
+      setStatusMessage(`Turno reservado para las ${hour}:00.`);
+      await Promise.all([loadCoreData(selectedDate), loadMyBookings(user.uid)]);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'SLOT_ALREADY_BOOKED') {
+        setStatusMessage('Ese turno ya fue reservado por otra persona. Elegí otro horario.');
+      } else {
+        setStatusMessage('No se pudo reservar el turno. Intentá nuevamente.');
+      }
+      await loadCoreData(selectedDate);
+    } finally {
+      setBookingInProgress(false);
+    }
   };
 
   const cancelBooking = async (bookingId) => {
@@ -507,6 +538,7 @@ function App() {
             onBookSlot={bookSlot}
             onGoLogin={() => goToAuth('login')}
             onGoRegister={() => goToAuth('register')}
+            bookingInProgress={bookingInProgress}
           />
         )}
 
