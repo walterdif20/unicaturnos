@@ -18,34 +18,13 @@ import {
   where
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import logo from '../logo.jpg';
-import complejo from '../imagendelcomplejo.jpg';
-
-const DEFAULT_DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-const DEFAULT_SCHEDULE = {
-  0: { open: 9, close: 23 },
-  1: { open: 9, close: 23 },
-  2: { open: 9, close: 23 },
-  3: { open: 9, close: 23 },
-  4: { open: 9, close: 23 },
-  5: { open: 9, close: 24 },
-  6: { open: 9, close: 24 }
-};
-
-const emptyRegister = {
-  firstName: '',
-  lastName: '',
-  phone: '',
-  email: '',
-  password: ''
-};
-
-const emptyLogin = { email: '', password: '' };
-
-const toLocalDate = (date) => {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-};
+import { DEFAULT_SCHEDULE, emptyLogin, emptyRegister } from './constants';
+import { buildUpcomingDates, toLocalDate } from './utils/date';
+import Header from './components/Header';
+import MainNav from './components/MainNav';
+import LandingPage from './pages/LandingPage';
+import AuthPage from './pages/AuthPage';
+import AdminPage from './pages/AdminPage';
 
 const getHours = (scheduleForDay) => {
   if (!scheduleForDay) return [];
@@ -55,21 +34,24 @@ const getHours = (scheduleForDay) => {
 };
 
 function App() {
+  const upcomingDates = useMemo(() => buildUpcomingDates(7), []);
+  const [activeSection, setActiveSection] = useState('landing');
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [courts, setCourts] = useState([]);
   const [schedules, setSchedules] = useState({});
   const [holidays, setHolidays] = useState([]);
   const [bookingsByCourtHour, setBookingsByCourtHour] = useState({});
-  const [selectedDate, setSelectedDate] = useState(toLocalDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = toLocalDate(new Date());
+    return upcomingDates.includes(today) ? today : upcomingDates[0];
+  });
   const [authError, setAuthError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [registerData, setRegisterData] = useState(emptyRegister);
   const [loginData, setLoginData] = useState(emptyLogin);
   const [newCourtName, setNewCourtName] = useState('');
   const [newHoliday, setNewHoliday] = useState('');
-
-  const isHoliday = holidays.includes(selectedDate);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (authUser) => {
@@ -131,7 +113,7 @@ function App() {
       });
       setRegisterData(emptyRegister);
       setStatusMessage('Registro exitoso. Ya podés reservar tu turno.');
-    } catch (error) {
+    } catch {
       setAuthError('No se pudo registrar. Revisá los datos ingresados.');
     }
   };
@@ -142,7 +124,7 @@ function App() {
     try {
       await signInWithEmailAndPassword(auth, loginData.email, loginData.password);
       setLoginData(emptyLogin);
-    } catch (error) {
+    } catch {
       setAuthError('Credenciales inválidas.');
     }
   };
@@ -154,6 +136,7 @@ function App() {
   const bookSlot = async (courtId, hour) => {
     if (!user) {
       setStatusMessage('Necesitás iniciar sesión para reservar.');
+      setActiveSection('registro');
       return;
     }
     const slotKey = `${courtId}-${hour}`;
@@ -231,195 +214,53 @@ function App() {
 
   return (
     <div className="app">
-      <header className="hero">
-        <img src={logo} alt="Logo La Única" className="logo" />
-        <div>
-          <h1>La Única - Sistema de Turnos</h1>
-          <p>Reservá tu cancha de fútbol en segundos y administrá horarios, feriados y disponibilidad.</p>
-        </div>
-      </header>
+      <Header />
+      <MainNav activeSection={activeSection} onChangeSection={setActiveSection} />
 
-      <img src={complejo} alt="Complejo La Única" className="banner" />
+      <main>
+        {activeSection === 'landing' && (
+          <LandingPage
+            selectedDate={selectedDate}
+            upcomingDates={upcomingDates}
+            holidays={holidays}
+            slotsByCourt={slotsByCourt}
+            bookingsByCourtHour={bookingsByCourtHour}
+            onChangeDate={setSelectedDate}
+            onBookSlot={bookSlot}
+          />
+        )}
 
-      <main className="content-grid">
-        <section className="card">
-          <h2>Disponibilidad</h2>
-          <label>
-            Día
-            <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
-          </label>
-          {isHoliday && <p className="holiday-alert">Este día es feriado. No hay turnos disponibles.</p>}
+        {activeSection === 'registro' && (
+          <AuthPage
+            user={user}
+            profile={profile}
+            authError={authError}
+            loginData={loginData}
+            registerData={registerData}
+            onChangeLogin={(field, value) => setLoginData((prev) => ({ ...prev, [field]: value }))}
+            onChangeRegister={(field, value) => setRegisterData((prev) => ({ ...prev, [field]: value }))}
+            onLogin={loginUser}
+            onRegister={registerUser}
+            onLogout={logoutUser}
+          />
+        )}
 
-          {!isHoliday &&
-            slotsByCourt.map((court) => (
-              <article key={court.id} className="court-block">
-                <h3>{court.name}</h3>
-                <div className="slot-grid">
-                  {court.hours.length === 0 && <p>Sin horarios configurados para {DEFAULT_DAYS[dayIndex]}.</p>}
-                  {court.hours.map((hour) => {
-                    const slotKey = `${court.id}-${hour}`;
-                    const booked = bookingsByCourtHour[slotKey];
-                    return (
-                      <button
-                        key={slotKey}
-                        type="button"
-                        disabled={Boolean(booked)}
-                        className={booked ? 'slot slot-booked' : 'slot slot-open'}
-                        onClick={() => bookSlot(court.id, hour)}
-                      >
-                        {hour}:00 {booked ? '· Reservado' : '· Disponible'}
-                      </button>
-                    );
-                  })}
-                </div>
-              </article>
-            ))}
-        </section>
-
-        <section className="card">
-          <h2>Cuenta</h2>
-          {user ? (
-            <div>
-              <p>
-                Sesión iniciada como <strong>{profile ? `${profile.firstName} ${profile.lastName}` : user.email}</strong>
-              </p>
-              <button type="button" onClick={logoutUser}>
-                Cerrar sesión
-              </button>
-            </div>
-          ) : (
-            <div className="auth-grid">
-              <form onSubmit={loginUser}>
-                <h3>Ingresar</h3>
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={loginData.email}
-                  onChange={(event) => setLoginData((prev) => ({ ...prev, email: event.target.value }))}
-                  required
-                />
-                <input
-                  type="password"
-                  placeholder="Contraseña"
-                  value={loginData.password}
-                  onChange={(event) => setLoginData((prev) => ({ ...prev, password: event.target.value }))}
-                  required
-                />
-                <button type="submit">Ingresar</button>
-              </form>
-
-              <form onSubmit={registerUser}>
-                <h3>Registro</h3>
-                <input
-                  type="text"
-                  placeholder="Nombre"
-                  value={registerData.firstName}
-                  onChange={(event) => setRegisterData((prev) => ({ ...prev, firstName: event.target.value }))}
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Apellido"
-                  value={registerData.lastName}
-                  onChange={(event) => setRegisterData((prev) => ({ ...prev, lastName: event.target.value }))}
-                  required
-                />
-                <input
-                  type="tel"
-                  placeholder="Celular"
-                  value={registerData.phone}
-                  onChange={(event) => setRegisterData((prev) => ({ ...prev, phone: event.target.value }))}
-                  required
-                />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={registerData.email}
-                  onChange={(event) => setRegisterData((prev) => ({ ...prev, email: event.target.value }))}
-                  required
-                />
-                <input
-                  type="password"
-                  placeholder="Contraseña"
-                  value={registerData.password}
-                  onChange={(event) => setRegisterData((prev) => ({ ...prev, password: event.target.value }))}
-                  required
-                />
-                <button type="submit">Crear cuenta</button>
-              </form>
-            </div>
-          )}
-          {authError && <p className="error">{authError}</p>}
-        </section>
-
-        <section className="card admin-card">
-          <h2>Administración de canchas y horarios</h2>
-          <form onSubmit={addCourt} className="inline-form">
-            <input
-              type="text"
-              placeholder="Nombre de la nueva cancha"
-              value={newCourtName}
-              onChange={(event) => setNewCourtName(event.target.value)}
-            />
-            <button type="submit">Agregar cancha</button>
-          </form>
-
-          {courts.map((court) => (
-            <article key={`${court.id}-admin`} className="admin-court">
-              <div className="admin-court-header">
-                <h3>{court.name}</h3>
-                <button type="button" onClick={() => removeCourt(court.id)}>
-                  Quitar cancha
-                </button>
-              </div>
-              <div className="schedule-grid">
-                {Object.entries(schedules[court.id] || DEFAULT_SCHEDULE).map(([day, schedule]) => (
-                  <div key={`${court.id}-${day}`}>
-                    <strong>{DEFAULT_DAYS[Number(day)]}</strong>
-                    <label>
-                      Desde
-                      <input
-                        type="number"
-                        min="0"
-                        max="23"
-                        value={schedule.open}
-                        onChange={(event) => saveScheduleHour(court.id, day, 'open', event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Hasta
-                      <input
-                        type="number"
-                        min="1"
-                        max="24"
-                        value={schedule.close}
-                        onChange={(event) => saveScheduleHour(court.id, day, 'close', event.target.value)}
-                      />
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </section>
-
-        <section className="card">
-          <h2>Feriados</h2>
-          <form onSubmit={addHoliday} className="inline-form">
-            <input type="date" value={newHoliday} onChange={(event) => setNewHoliday(event.target.value)} />
-            <button type="submit">Agregar feriado</button>
-          </form>
-          <ul>
-            {holidays.map((holiday) => (
-              <li key={holiday}>
-                {holiday}
-                <button type="button" onClick={() => removeHoliday(holiday)}>
-                  Quitar
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        {activeSection === 'admin' && (
+          <AdminPage
+            courts={courts}
+            schedules={schedules}
+            holidays={holidays}
+            newCourtName={newCourtName}
+            newHoliday={newHoliday}
+            onChangeNewCourt={setNewCourtName}
+            onChangeNewHoliday={setNewHoliday}
+            onAddCourt={addCourt}
+            onRemoveCourt={removeCourt}
+            onSaveScheduleHour={saveScheduleHour}
+            onAddHoliday={addHoliday}
+            onRemoveHoliday={removeHoliday}
+          />
+        )}
       </main>
 
       {statusMessage && <p className="status">{statusMessage}</p>}
