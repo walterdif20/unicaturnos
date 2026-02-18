@@ -24,7 +24,13 @@ function AdminPage({
   roleSuggestions,
   adminUsers,
   onMakeAdmin,
-  onRemoveAdmin
+  onRemoveAdmin,
+  manualBookingData,
+  onChangeManualBookingField,
+  onCreateManualBooking,
+  manualBookableDates,
+  manualBookableCourts,
+  manualBookableHours
 }) {
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const [activeAdminPanel, setActiveAdminPanel] = useState('canchas');
@@ -159,6 +165,100 @@ function AdminPage({
           <article className="admin-panel">
             <h3>Turnos reservados</h3>
             <p className="admin-panel-subtitle">Tabla con reservas, cancha y datos del cliente.</p>
+
+            <section className="manual-booking-card">
+              <h4>Cargar turno manual</h4>
+              <p className="admin-panel-subtitle">
+                Usá esta herramienta para reservar un turno a nombre de una persona sin cuenta.
+              </p>
+
+              <form className="manual-booking-form" onSubmit={onCreateManualBooking}>
+                <label>
+                  Fecha
+                  <select
+                    value={manualBookingData.date}
+                    onChange={(event) => onChangeManualBookingField('date', event.target.value)}
+                    disabled={manualBookableDates.length === 0}
+                  >
+                    {manualBookableDates.length === 0 && <option value="">Sin fechas disponibles</option>}
+                    {manualBookableDates.map((date) => (
+                      <option key={date} value={date}>
+                        {date}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Cancha
+                  <select
+                    value={manualBookingData.courtId}
+                    onChange={(event) => onChangeManualBookingField('courtId', event.target.value)}
+                    disabled={manualBookableCourts.length === 0}
+                  >
+                    {manualBookableCourts.length === 0 && <option value="">Sin canchas disponibles</option>}
+                    {manualBookableCourts.map((court) => (
+                      <option key={court.id} value={court.id}>
+                        {court.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Horario
+                  <select
+                    value={manualBookingData.hour}
+                    onChange={(event) => onChangeManualBookingField('hour', event.target.value)}
+                    disabled={manualBookableHours.length === 0}
+                  >
+                    {manualBookableHours.length === 0 && <option value="">Sin horarios disponibles</option>}
+                    {manualBookableHours.map((hour) => (
+                      <option key={`${manualBookingData.courtId}-${hour}`} value={hour}>
+                        {hour}:00
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Nombre
+                  <input
+                    type="text"
+                    value={manualBookingData.firstName}
+                    onChange={(event) => onChangeManualBookingField('firstName', event.target.value)}
+                    placeholder="Nombre"
+                  />
+                </label>
+
+                <label>
+                  Apellido
+                  <input
+                    type="text"
+                    value={manualBookingData.lastName}
+                    onChange={(event) => onChangeManualBookingField('lastName', event.target.value)}
+                    placeholder="Apellido"
+                  />
+                </label>
+
+                <label>
+                  Teléfono
+                  <input
+                    type="tel"
+                    value={manualBookingData.phone}
+                    onChange={(event) => onChangeManualBookingField('phone', event.target.value)}
+                    placeholder="+54 11 1234-5678"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={manualBookableDates.length === 0 || manualBookableCourts.length === 0 || manualBookableHours.length === 0}
+                >
+                  Cargar turno manual
+                </button>
+              </form>
+            </section>
 
             <div className="day-filter-buttons" role="group" aria-label="Filtrar turnos por día de la semana">
               <button

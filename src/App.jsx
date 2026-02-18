@@ -45,6 +45,14 @@ const buildPhone = ({ countryCode, areaCode, phoneNumber }) =>
 const isProfileComplete = (profile) => Boolean(profile?.firstName && profile?.lastName && profile?.phone);
 
 const buildConfirmationToken = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const emptyManualBooking = {
+  date: '',
+  courtId: '',
+  hour: '',
+  firstName: '',
+  lastName: '',
+  phone: ''
+};
 
 function App() {
   const upcomingDates = useMemo(() => buildUpcomingDates(7), []);
@@ -77,6 +85,7 @@ function App() {
   const [roleSearch, setRoleSearch] = useState('');
   const [selectedRoleUser, setSelectedRoleUser] = useState(null);
   const [bookingInProgress, setBookingInProgress] = useState(false);
+  const [manualBookingData, setManualBookingData] = useState(emptyManualBooking);
 
   const loadMyBookings = async (uid) => {
     if (!uid) {
@@ -481,6 +490,133 @@ function App() {
       .slice(0, 8);
   }, [allUsers, roleSearch]);
 
+  const adminBookableDates = useMemo(
+    () => upcomingDates.filter((date) => !holidays.includes(date)),
+    [upcomingDates, holidays]
+  );
+
+  const manualBookingAvailability = useMemo(() => {
+    if (!manualBookingData.date) {
+      return { courts: [], hoursByCourt: {} };
+    }
+
+    const occupiedSlots = new Set(
+      adminBookings
+        .filter((booking) => booking.date === manualBookingData.date)
+        .map((booking) => `${booking.courtId}-${booking.hour}`)
+    );
+
+    const dayIndexForManual = new Date(`${manualBookingData.date}T00:00:00`).getDay();
+    const hoursByCourt = {};
+
+    courts.forEach((court) => {
+      const daySchedule = (schedules[court.id] || DEFAULT_SCHEDULE)[dayIndexForManual];
+      const availableHours = getHours(daySchedule)
+        .filter((hour) => !isPastSlotInArgentina(manualBookingData.date, hour))
+        .filter((hour) => !occupiedSlots.has(`${court.id}-${hour}`));
+      hoursByCourt[court.id] = availableHours;
+    });
+
+    return {
+      courts: courts.filter((court) => (hoursByCourt[court.id] || []).length > 0),
+      hoursByCourt
+    };
+  }, [adminBookings, courts, manualBookingData.date, schedules]);
+
+  useEffect(() => {
+    setManualBookingData((prev) => {
+      const fallbackDate = adminBookableDates[0] || '';
+      const validDate = prev.date && adminBookableDates.includes(prev.date) ? prev.date : fallbackDate;
+
+      if (validDate !== prev.date) {
+        return { ...prev, date: validDate, courtId: '', hour: '' };
+      }
+      return prev;
+    });
+  }, [adminBookableDates]);
+
+  useEffect(() => {
+    setManualBookingData((prev) => {
+      const availableCourtIds = manualBookingAvailability.courts.map((court) => court.id);
+      const validCourtId = availableCourtIds.includes(prev.courtId) ? prev.courtId : availableCourtIds[0] || '';
+      const availableHours = manualBookingAvailability.hoursByCourt[validCourtId] || [];
+      const hourAsNumber = Number(prev.hour);
+      const validHour = availableHours.includes(hourAsNumber) ? String(hourAsNumber) : String(availableHours[0] ?? '');
+
+      if (prev.courtId !== validCourtId || prev.hour !== validHour) {
+        return {
+          ...prev,
+          courtId: validCourtId,
+          hour: validHour
+        };
+      }
+
+      return prev;
+    });
+  }, [manualBookingAvailability]);
+
+  const createManualBooking = async (event) => {
+    event.preventDefault();
+
+    const firstName = manualBookingData.firstName.trim();
+    const lastName = manualBookingData.lastName.trim();
+    const phone = manualBookingData.phone.trim();
+
+    if (!firstName || !lastName || !phone) {
+      setStatusMessage('Completá nombre, apellido y teléfono para cargar el turno manual.');
+      return;
+    }
+
+    if (!manualBookingData.date || !manualBookingData.courtId || manualBookingData.hour === '') {
+      setStatusMessage('Seleccioná fecha, cancha y horario para registrar el turno manual.');
+      return;
+    }
+
+    const selectedHour = Number(manualBookingData.hour);
+    const validHours = manualBookingAvailability.hoursByCourt[manualBookingData.courtId] || [];
+    if (!validHours.includes(selectedHour)) {
+      setStatusMessage('El turno seleccionado ya no está disponible. Elegí otro horario.');
+      await loadCoreData(selectedDate);
+      return;
+    }
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const bookingId = `${manualBookingData.date}_${manualBookingData.courtId}_${selectedHour}`;
+        const bookingRef = doc(db, 'bookings', bookingId);
+        const existingBooking = await transaction.get(bookingRef);
+
+        if (existingBooking.exists()) {
+          throw new Error('SLOT_ALREADY_BOOKED');
+        }
+
+        transaction.set(bookingRef, {
+          courtId: manualBookingData.courtId,
+          hour: selectedHour,
+          date: manualBookingData.date,
+          userId: null,
+          userName: `${firstName} ${lastName}`,
+          userPhone: phone,
+          status: 'reservado',
+          bookedByAdmin: true,
+          confirmationToken: buildConfirmationToken(),
+          createdAt: serverTimestamp()
+        });
+      });
+
+      setStatusMessage('Turno cargado manualmente con éxito.');
+      setManualBookingData((prev) => ({ ...prev, firstName: '', lastName: '', phone: '' }));
+      await loadCoreData(selectedDate);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'SLOT_ALREADY_BOOKED') {
+        setStatusMessage('Ese turno ya fue reservado por otra persona. Elegí otro horario.');
+      } else {
+        setStatusMessage('No se pudo cargar el turno manual. Intentá nuevamente.');
+      }
+      await loadCoreData(selectedDate);
+    }
+  };
+
   const profileDraft = {
     firstName: registerData.firstName || profile?.firstName || '',
     lastName: registerData.lastName || profile?.lastName || '',
@@ -598,6 +734,14 @@ function App() {
             adminUsers={adminUsers}
             onMakeAdmin={makeAdministrator}
             onRemoveAdmin={removeAdministrator}
+            manualBookingData={manualBookingData}
+            onChangeManualBookingField={(field, value) =>
+              setManualBookingData((prev) => ({ ...prev, [field]: value }))
+            }
+            onCreateManualBooking={createManualBooking}
+            manualBookableDates={adminBookableDates}
+            manualBookableCourts={manualBookingAvailability.courts}
+            manualBookableHours={manualBookingAvailability.hoursByCourt[manualBookingData.courtId] || []}
           />
         )}
       </main>
