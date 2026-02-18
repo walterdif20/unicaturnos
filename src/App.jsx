@@ -342,6 +342,12 @@ function App() {
     await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
   };
 
+  const cancelBookingFromAdmin = async (bookingId) => {
+    await deleteDoc(doc(db, 'bookings', bookingId));
+    setStatusMessage('Turno cancelado desde administración.');
+    await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
+  };
+
   const addCourt = async (event) => {
     event.preventDefault();
     if (!newCourtName.trim()) return;
@@ -481,6 +487,7 @@ function App() {
             onAddHoliday={addHoliday}
             onRemoveHoliday={removeHoliday}
             adminBookings={adminBookings}
+            onCancelBooking={cancelBookingFromAdmin}
           />
         )}
       </main>

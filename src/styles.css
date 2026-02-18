@@ -337,6 +337,18 @@ input {
   display: inline-block;
 }
 
+
+.confirm-check {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.btn-cancel {
+  background: #ef4444;
+  color: #fff;
+  border-color: #b91c1c;
+}
+
 .admin-court-header {
   display: flex;
   justify-content: space-between;

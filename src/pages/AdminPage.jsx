@@ -13,7 +13,8 @@ function AdminPage({
   onSaveScheduleHour,
   onAddHoliday,
   onRemoveHoliday,
-  adminBookings
+  adminBookings,
+  onCancelBooking
 }) {
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -120,12 +121,13 @@ function AdminPage({
                   <th>Estado</th>
                   <th>WhatsApp</th>
                   <th>Confirmación</th>
+                  <th>Cancelar</th>
                 </tr>
               </thead>
               <tbody>
                 {adminBookings.length === 0 ? (
                   <tr>
-                    <td colSpan={7}>No hay turnos reservados.</td>
+                    <td colSpan={8}>No hay turnos reservados.</td>
                   </tr>
                 ) : (
                   adminBookings.map((booking) => {
@@ -154,13 +156,22 @@ function AdminPage({
                           )}
                         </td>
                         <td>
-                          {confirmUrl ? (
+                          {booking.status === 'confirmado' ? (
+                            <span className="confirm-check" aria-label="Turno confirmado" title="Turno confirmado">
+                              ✓ Confirmado
+                            </span>
+                          ) : confirmUrl ? (
                             <a className="btn-secondary btn-confirm" href={confirmUrl} target="_blank" rel="noreferrer">
                               Solicitar confirmación
                             </a>
                           ) : (
                             '-'
                           )}
+                        </td>
+                        <td>
+                          <button type="button" className="btn-cancel" onClick={() => onCancelBooking(booking.id)}>
+                            Cancelar turno
+                          </button>
                         </td>
                       </tr>
                     );
