@@ -226,6 +226,12 @@ function App() {
     }
   }, [user, profile]);
 
+  useEffect(() => {
+    if (!canAccessAdmin && activeSection === 'admin') {
+      setActiveSection('landing');
+    }
+  }, [activeSection, canAccessAdmin]);
+
   const goToAuth = (mode) => {
     setAuthView(mode);
     setActiveSection('registro');
@@ -692,7 +698,7 @@ function App() {
   return (
     <div className="app">
       <Header />
-      <MainNav activeSection={activeSection} onChangeSection={setActiveSection} />
+      <MainNav activeSection={activeSection} onChangeSection={setActiveSection} canAccessAdmin={canAccessAdmin} />
 
       <main>
         {loading ? (
@@ -773,7 +779,7 @@ function App() {
           />
         )}
 
-        {!loading && activeSection === 'admin' && (
+        {!loading && canAccessAdmin && activeSection === 'admin' && (
           <AdminPage
             courts={courts}
             schedules={schedules}

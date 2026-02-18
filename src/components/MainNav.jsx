@@ -2,13 +2,15 @@ const sections = [
   { id: 'landing', label: 'Reservas' },
   { id: 'registro', label: 'Mi cuenta' },
   { id: 'mis-reservas', label: 'Mis reservas' },
-  { id: 'admin', label: 'Administración' }
+  { id: 'admin', label: 'Administración', requiresAdmin: true }
 ];
 
-function MainNav({ activeSection, onChangeSection }) {
+function MainNav({ activeSection, onChangeSection, canAccessAdmin }) {
+  const visibleSections = sections.filter((section) => !section.requiresAdmin || canAccessAdmin);
+
   return (
     <nav className="main-nav" aria-label="Secciones principales">
-      {sections.map((section) => (
+      {visibleSections.map((section) => (
         <button
           key={section.id}
           type="button"

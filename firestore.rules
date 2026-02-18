@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function validUserProfileCreate(data) {
+      return data.keys().hasOnly(['firstName', 'lastName', 'phone', 'email', 'isAdmin'])
+        && (!('isAdmin' in data) || data.isAdmin == false);
+    }
+
+    function validUserProfileUpdate(newData, oldData) {
+      return newData.keys().hasOnly(['firstName', 'lastName', 'phone', 'email', 'isAdmin'])
+        && newData.isAdmin == oldData.isAdmin;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && validUserProfileCreate(request.resource.data);
+      allow update: if (isOwner(uid) && validUserProfileUpdate(request.resource.data, resource.data))
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /courts/{courtId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /schedules/{courtId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if true;
+
+      // Usuario dueño: crea y cancela sus propios turnos.
+      // Admin: puede crear/cancelar cualquier turno (incluye carga manual).
+      allow create: if isAdmin()
+                    || (isSignedIn()
+                        && request.resource.data.userId == request.auth.uid
+                        && request.resource.data.status == 'reservado');
+
+      allow update: if isAdmin();
+
+      allow delete: if isAdmin()
+                    || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+  }
+}
