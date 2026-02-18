@@ -315,6 +315,13 @@ input {
 }
 
 
+.day-filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+
 .role-manager,
 .admin-users-list {
   display: grid;
@@ -506,4 +513,65 @@ li {
   border-radius: 0.75rem;
   background: #0f172a;
   padding: 0.75rem;
+}
+
+
+@media (max-width: 820px) {
+  .admin-table-wrapper {
+    overflow-x: visible;
+  }
+
+  .admin-table {
+    border: 0;
+  }
+
+  .admin-table thead {
+    display: none;
+  }
+
+  .admin-table,
+  .admin-table tbody,
+  .admin-table tr,
+  .admin-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-table tr {
+    border: 1px solid #334155;
+    border-radius: 0.7rem;
+    background: #0b1220;
+    margin-bottom: 0.7rem;
+    padding: 0.15rem;
+  }
+
+  .admin-table td {
+    border: 0;
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.65rem;
+    text-align: right;
+    padding: 0.55rem;
+  }
+
+  .admin-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .admin-table td::before {
+    content: attr(data-label);
+    color: #93c5fd;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .admin-table td[colspan] {
+    text-align: left;
+    justify-content: flex-start;
+  }
+
+  .admin-table td[colspan]::before {
+    content: '';
+  }
 }

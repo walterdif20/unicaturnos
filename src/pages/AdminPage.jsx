@@ -28,11 +28,22 @@ function AdminPage({
 }) {
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const [activeAdminPanel, setActiveAdminPanel] = useState('canchas');
+  const [selectedDayFilter, setSelectedDayFilter] = useState('all');
 
   const adminUsersById = useMemo(
     () => Object.fromEntries(adminUsers.map((adminUser) => [adminUser.id, adminUser])),
     [adminUsers]
   );
+
+  const filteredAdminBookings = useMemo(() => {
+    if (selectedDayFilter === 'all') return adminBookings;
+
+    return adminBookings.filter((booking) => {
+      if (!booking.date) return false;
+      const bookingDay = new Date(`${booking.date}T00:00:00`).getDay();
+      return bookingDay === Number(selectedDayFilter);
+    });
+  }, [adminBookings, selectedDayFilter]);
 
   const buildConfirmationLink = (booking) => {
     if (!appOrigin || !booking?.id) return '';
@@ -153,6 +164,27 @@ function AdminPage({
           <article className="admin-panel">
             <h3>Turnos reservados</h3>
             <p className="admin-panel-subtitle">Tabla con reservas, cancha y datos del cliente.</p>
+
+            <div className="day-filter-buttons" role="group" aria-label="Filtrar turnos por día de la semana">
+              <button
+                type="button"
+                className={selectedDayFilter === 'all' ? 'nav-pill nav-pill-active' : 'nav-pill'}
+                onClick={() => setSelectedDayFilter('all')}
+              >
+                Todos
+              </button>
+              {DEFAULT_DAYS.map((day, dayIndex) => (
+                <button
+                  key={day}
+                  type="button"
+                  className={selectedDayFilter === String(dayIndex) ? 'nav-pill nav-pill-active' : 'nav-pill'}
+                  onClick={() => setSelectedDayFilter(String(dayIndex))}
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
+
             <div className="admin-table-wrapper">
               <table className="admin-table">
                 <thead>
@@ -168,23 +200,23 @@ function AdminPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {adminBookings.length === 0 ? (
+                  {filteredAdminBookings.length === 0 ? (
                     <tr>
                       <td colSpan={8}>No hay turnos reservados.</td>
                     </tr>
                   ) : (
-                    adminBookings.map((booking) => {
+                    filteredAdminBookings.map((booking) => {
                       const courtName = courts.find((court) => court.id === booking.courtId)?.name || booking.courtId;
                       const confirmUrl = buildWhatsappConfirmUrl(booking, courtName);
 
                       return (
                         <tr key={booking.id}>
-                          <td>{booking.date || '-'}</td>
-                          <td>{booking.hour !== undefined && booking.hour !== null ? `${booking.hour}:00` : '-'}</td>
-                          <td>{courtName}</td>
-                          <td>{booking.userName || '-'}</td>
-                          <td>{booking.status || 'reservado'}</td>
-                          <td>
+                          <td data-label="Fecha">{booking.date || '-'}</td>
+                          <td data-label="Hora">{booking.hour !== undefined && booking.hour !== null ? `${booking.hour}:00` : '-'}</td>
+                          <td data-label="Cancha">{courtName}</td>
+                          <td data-label="Nombre y apellido">{booking.userName || '-'}</td>
+                          <td data-label="Estado">{booking.status || 'reservado'}</td>
+                          <td data-label="WhatsApp">
                             {booking.userPhone ? (
                               <a
                                 className="btn-whatsapp"
@@ -198,7 +230,7 @@ function AdminPage({
                               '-'
                             )}
                           </td>
-                          <td>
+                          <td data-label="Confirmación">
                             {booking.status === 'confirmado' ? (
                               <span className="confirm-check" aria-label="Turno confirmado" title="Turno confirmado">
                                 ✓ Confirmado
@@ -211,7 +243,7 @@ function AdminPage({
                               '-'
                             )}
                           </td>
-                          <td>
+                          <td data-label="Cancelar">
                             <button type="button" className="btn-cancel" onClick={() => onCancelBooking(booking.id)}>
                               Cancelar turno
                             </button>
