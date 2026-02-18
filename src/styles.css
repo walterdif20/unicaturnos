@@ -1,0 +1,158 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #f7fbff;
+  background: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(145deg, #0f172a, #1e293b);
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.hero {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #334155;
+}
+
+.logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.banner {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: 1rem;
+  margin: 1rem 0;
+  border: 1px solid #334155;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid #334155;
+  border-radius: 0.85rem;
+  padding: 1rem;
+}
+
+.auth-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+input,
+button {
+  border-radius: 0.45rem;
+  border: 1px solid #475569;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: #22c55e;
+  color: #052e16;
+  font-weight: 700;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
+.slot-booked {
+  background: #ef4444;
+  color: #fff;
+}
+
+.slot-open {
+  background: #22c55e;
+}
+
+.inline-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.inline-form input {
+  flex: 1;
+}
+
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.admin-court {
+  border-top: 1px solid #475569;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.admin-court-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.holiday-alert,
+.error {
+  color: #fda4af;
+  font-weight: 700;
+}
+
+.status {
+  margin-top: 1rem;
+  background: #14532d;
+  color: #dcfce7;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+}
+
+ul {
+  padding-left: 1rem;
+}
+
+li {
+  margin-bottom: 0.35rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
