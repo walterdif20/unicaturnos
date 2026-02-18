@@ -45,6 +45,25 @@ npm run build
 npm run preview
 ```
 
+
+## Seguridad (Firestore Rules)
+
+> Importante: ocultar botones en frontend **no** reemplaza autorización en backend.
+
+Se agregó `firestore.rules` para que:
+- solo admins puedan escribir en `courts`, `schedules`, `settings` y gestionar admins.
+- usuarios normales solo puedan crear/cancelar sus propias reservas.
+- un usuario no pueda escalar privilegios cambiando su `isAdmin`.
+
+### Deploy de reglas
+
+```bash
+npm i -g firebase-tools
+firebase login
+firebase use <tu-proyecto>
+firebase deploy --only firestore:rules
+```
+
 ## Modelo de datos sugerido (Firestore)
 
 - `users/{uid}`: `firstName`, `lastName`, `phone`, `email`

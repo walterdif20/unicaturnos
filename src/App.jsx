@@ -86,6 +86,12 @@ function App() {
   const [selectedRoleUser, setSelectedRoleUser] = useState(null);
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [manualBookingData, setManualBookingData] = useState(emptyManualBooking);
+  const canAccessAdmin = Boolean(user && profile?.isAdmin);
+
+  const requestConfirmation = (message) => {
+    if (typeof window === 'undefined') return true;
+    return window.confirm(message);
+  };
 
   const loadMyBookings = async (uid) => {
     if (!uid) {
@@ -200,6 +206,12 @@ function App() {
     }
   }, [user, profile]);
 
+  useEffect(() => {
+    if (!canAccessAdmin && activeSection === 'admin') {
+      setActiveSection('landing');
+    }
+  }, [activeSection, canAccessAdmin]);
+
   const goToAuth = (mode) => {
     setAuthView(mode);
     setActiveSection('registro');
@@ -290,6 +302,7 @@ function App() {
   };
 
   const logoutUser = async () => {
+    if (!requestConfirmation('¿Estás seguro de que querés cerrar sesión?')) return;
     await signOut(auth);
     setStatusMessage('Sesión cerrada.');
   };
@@ -317,6 +330,8 @@ function App() {
       setActiveSection('mis-reservas');
       return;
     }
+
+    if (!requestConfirmation(`¿Estás seguro de que querés reservar el turno de las ${hour}:00?`)) return;
 
     setBookingInProgress(true);
     try {
@@ -357,18 +372,21 @@ function App() {
   };
 
   const cancelBooking = async (bookingId) => {
+    if (!requestConfirmation('¿Estás seguro de que querés cancelar esta reserva?')) return;
     await deleteDoc(doc(db, 'bookings', bookingId));
     setStatusMessage('Reserva cancelada correctamente.');
     await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
   };
 
   const cancelBookingFromAdmin = async (bookingId) => {
+    if (!requestConfirmation('¿Estás seguro de que querés cancelar este turno?')) return;
     await deleteDoc(doc(db, 'bookings', bookingId));
     setStatusMessage('Turno cancelado desde administración.');
     await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
   };
 
   const makeAdministrator = async (uid) => {
+    if (!requestConfirmation('¿Estás seguro de que querés otorgar permisos de administrador?')) return;
     await setDoc(doc(db, 'users', uid), { isAdmin: true }, { merge: true });
     setStatusMessage('Usuario actualizado como administrador.');
     setSelectedRoleUser(null);
@@ -377,6 +395,7 @@ function App() {
   };
 
   const removeAdministrator = async (uid) => {
+    if (!requestConfirmation('¿Estás seguro de que querés quitar los permisos de administrador?')) return;
     await setDoc(doc(db, 'users', uid), { isAdmin: false }, { merge: true });
     setStatusMessage('Permiso de administrador removido.');
     await loadCoreData(selectedDate);
@@ -403,6 +422,7 @@ function App() {
       }
 
       if (willAttend) {
+        if (!requestConfirmation('¿Estás seguro de que querés confirmar tu asistencia?')) return;
         if (bookingData.status !== 'confirmado') {
           await setDoc(bookingRef, { status: 'confirmado', confirmedAt: serverTimestamp() }, { merge: true });
           setStatusMessage('¡Gracias! Confirmaste tu asistencia al turno.');
@@ -410,6 +430,7 @@ function App() {
           setStatusMessage('Este turno ya estaba confirmado.');
         }
       } else {
+        if (!requestConfirmation('¿Estás seguro de que querés liberar este turno?')) return;
         await deleteDoc(bookingRef);
         setStatusMessage('Liberaste el turno correctamente para otra persona.');
       }
@@ -428,6 +449,7 @@ function App() {
   const addCourt = async (event) => {
     event.preventDefault();
     if (!newCourtName.trim()) return;
+    if (!requestConfirmation('¿Estás seguro de que querés agregar esta cancha?')) return;
     const created = await addDoc(collection(db, 'courts'), { name: newCourtName.trim() });
     await setDoc(doc(db, 'schedules', created.id), DEFAULT_SCHEDULE);
     setNewCourtName('');
@@ -436,6 +458,7 @@ function App() {
   };
 
   const removeCourt = async (courtId) => {
+    if (!requestConfirmation('¿Estás seguro de que querés eliminar esta cancha?')) return;
     await deleteDoc(doc(db, 'courts', courtId));
     await deleteDoc(doc(db, 'schedules', courtId));
     setStatusMessage('Cancha eliminada.');
@@ -458,6 +481,7 @@ function App() {
   const addHoliday = async (event) => {
     event.preventDefault();
     if (!newHoliday || holidays.includes(newHoliday)) return;
+    if (!requestConfirmation('¿Estás seguro de que querés agregar este feriado?')) return;
     const updated = [...holidays, newHoliday].sort();
     await setDoc(doc(db, 'settings', 'holidays'), { dates: updated });
     setHolidays(updated);
@@ -465,6 +489,7 @@ function App() {
   };
 
   const removeHoliday = async (date) => {
+    if (!requestConfirmation('¿Estás seguro de que querés quitar este feriado?')) return;
     const updated = holidays.filter((holiday) => holiday !== date);
     await setDoc(doc(db, 'settings', 'holidays'), { dates: updated });
     setHolidays(updated);
@@ -580,6 +605,8 @@ function App() {
       return;
     }
 
+    if (!requestConfirmation('¿Estás seguro de que querés cargar este turno manual?')) return;
+
     try {
       await runTransaction(db, async (transaction) => {
         const bookingId = `${manualBookingData.date}_${manualBookingData.courtId}_${selectedHour}`;
@@ -628,7 +655,7 @@ function App() {
   return (
     <div className="app">
       <Header />
-      <MainNav activeSection={activeSection} onChangeSection={setActiveSection} />
+      <MainNav activeSection={activeSection} onChangeSection={setActiveSection} canAccessAdmin={canAccessAdmin} />
 
       <main>
         {loading ? (
@@ -706,7 +733,7 @@ function App() {
           />
         )}
 
-        {!loading && activeSection === 'admin' && (
+        {!loading && canAccessAdmin && activeSection === 'admin' && (
           <AdminPage
             courts={courts}
             schedules={schedules}
