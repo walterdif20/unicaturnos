@@ -13,9 +13,7 @@ export const DEFAULT_SCHEDULE = {
 export const emptyRegister = {
   firstName: '',
   lastName: '',
-  phone: '',
-  email: '',
-  password: ''
+  countryCode: '',
+  areaCode: '',
+  phoneNumber: ''
 };
-
-export const emptyLogin = { email: '', password: '' };

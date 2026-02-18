@@ -1,6 +1,6 @@
 const sections = [
-  { id: 'landing', label: 'Landing' },
-  { id: 'registro', label: 'Registro / Cuenta' },
+  { id: 'landing', label: 'Reservas' },
+  { id: 'registro', label: 'Mi cuenta' },
   { id: 'admin', label: 'Administración' }
 ];
 

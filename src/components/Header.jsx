@@ -5,8 +5,9 @@ function Header() {
     <header className="hero">
       <img src={logo} alt="Logo La Única" className="logo" />
       <div>
-        <h1>La Única - Sistema de Turnos</h1>
-        <p>Reservá tu cancha de fútbol en segundos y administrá horarios, feriados y disponibilidad.</p>
+        <p className="eyebrow">La Única · Gestión deportiva</p>
+        <h1>Sistema de turnos online</h1>
+        <p>Reservá tu cancha en segundos, con disponibilidad en tiempo real y panel administrativo centralizado.</p>
       </div>
     </header>
   );
