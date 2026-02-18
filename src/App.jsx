@@ -71,6 +71,10 @@ function App() {
   const [newHoliday, setNewHoliday] = useState('');
   const [pendingConfirmation, setPendingConfirmation] = useState(null);
   const [confirmationLoading, setConfirmationLoading] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [roleSearch, setRoleSearch] = useState('');
+  const [selectedRoleUser, setSelectedRoleUser] = useState(null);
 
   const loadMyBookings = async (uid) => {
     if (!uid) {
@@ -151,6 +155,14 @@ function App() {
       .map((booking) => ({ id: booking.id, ...booking.data() }))
       .sort((a, b) => `${a.date || ''}-${a.hour || 0}`.localeCompare(`${b.date || ''}-${b.hour || 0}`));
     setAdminBookings(allBookings);
+
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const usersData = usersSnapshot.docs
+      .map((userDoc) => ({ id: userDoc.id, ...userDoc.data() }))
+      .filter((entry) => entry.email)
+      .sort((a, b) => a.email.localeCompare(b.email));
+    setAllUsers(usersData);
+    setAdminUsers(usersData.filter((entry) => entry.isAdmin));
   };
 
   useEffect(() => {
@@ -321,6 +333,20 @@ function App() {
     await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
   };
 
+  const makeAdministrator = async (uid) => {
+    await setDoc(doc(db, 'users', uid), { isAdmin: true }, { merge: true });
+    setStatusMessage('Usuario actualizado como administrador.');
+    setSelectedRoleUser(null);
+    setRoleSearch('');
+    await loadCoreData(selectedDate);
+  };
+
+  const removeAdministrator = async (uid) => {
+    await setDoc(doc(db, 'users', uid), { isAdmin: false }, { merge: true });
+    setStatusMessage('Permiso de administrador removido.');
+    await loadCoreData(selectedDate);
+  };
+
   const respondBookingConfirmation = async (willAttend) => {
     if (!pendingConfirmation || confirmationLoading) return;
 
@@ -419,6 +445,15 @@ function App() {
       })),
     [courts, schedules, dayIndex, selectedDate]
   );
+
+  const roleSuggestions = useMemo(() => {
+    const normalizedSearch = roleSearch.trim().toLowerCase();
+    if (!normalizedSearch) return [];
+
+    return allUsers
+      .filter((entry) => entry.email.toLowerCase().includes(normalizedSearch))
+      .slice(0, 8);
+  }, [allUsers, roleSearch]);
 
   const profileDraft = {
     firstName: registerData.firstName || profile?.firstName || '',
@@ -524,6 +559,18 @@ function App() {
             onRemoveHoliday={removeHoliday}
             adminBookings={adminBookings}
             onCancelBooking={cancelBookingFromAdmin}
+            roleSearch={roleSearch}
+            onChangeRoleSearch={setRoleSearch}
+            selectedRoleUser={selectedRoleUser}
+            onSelectRoleUser={setSelectedRoleUser}
+            onClearRoleSelection={() => {
+              setSelectedRoleUser(null);
+              setRoleSearch('');
+            }}
+            roleSuggestions={roleSuggestions}
+            adminUsers={adminUsers}
+            onMakeAdmin={makeAdministrator}
+            onRemoveAdmin={removeAdministrator}
           />
         )}
       </main>
