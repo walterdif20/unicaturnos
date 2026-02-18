@@ -356,3 +356,27 @@ li {
     grid-template-columns: 1fr;
   }
 }
+
+.my-bookings-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.bookings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.booking-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  background: #0f172a;
+  padding: 0.75rem;
+}

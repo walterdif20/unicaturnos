@@ -12,9 +12,11 @@ function AuthPage({
   onChangeProfileDraft,
   onLogin,
   onRegister,
+  onGoogleLogin,
   onSaveProfile,
   onLogout,
-  profileComplete
+  profileComplete,
+  authLoading
 }) {
   return (
     <section className="card auth-card">
@@ -37,6 +39,10 @@ function AuthPage({
               Registrarse
             </button>
           </div>
+
+          <button type="button" className="btn-secondary" onClick={onGoogleLogin} disabled={authLoading}>
+            Ingresar con Google
+          </button>
 
           {authView === 'login' ? (
             <form onSubmit={onLogin} className="profile-form">
