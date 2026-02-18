@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   onAuthStateChanged,
-  signInWithEmailAndPassword,
+  signInWithRedirect,
   signOut
 } from 'firebase/auth';
 import {
@@ -18,13 +18,15 @@ import {
   where
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { DEFAULT_SCHEDULE, emptyLogin, emptyRegister } from './constants';
+import { DEFAULT_SCHEDULE, emptyRegister } from './constants';
 import { buildUpcomingDates, toLocalDate } from './utils/date';
 import Header from './components/Header';
 import MainNav from './components/MainNav';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import AdminPage from './pages/AdminPage';
+
+const googleProvider = new GoogleAuthProvider();
 
 const getHours = (scheduleForDay) => {
   if (!scheduleForDay) return [];
@@ -33,9 +35,36 @@ const getHours = (scheduleForDay) => {
   return Array.from({ length: close - open }, (_, idx) => open + idx);
 };
 
+const buildPhone = ({ countryCode, areaCode, phoneNumber }) =>
+  `+${countryCode.trim()} ${areaCode.trim()} ${phoneNumber.trim()}`.replace(/\s+/g, ' ').trim();
+
+const isProfileComplete = (profile) => Boolean(profile?.firstName && profile?.lastName && profile?.phone);
+
+const getGoogleAuthErrorMessage = (error) => {
+  if (!error?.code) return 'No se pudo iniciar sesión con Google. Intentá nuevamente.';
+
+  switch (error.code) {
+    case 'auth/configuration-not-found':
+      return 'Google Sign-In no está configurado en Firebase. Activá el proveedor Google en Authentication > Sign-in method.';
+    case 'auth/unauthorized-domain':
+      return 'Este dominio no está autorizado en Firebase Auth. Agregalo en Authentication > Settings > Authorized domains.';
+    case 'auth/popup-blocked':
+      return 'El navegador bloqueó la ventana emergente. Habilitá popups o intentá nuevamente.';
+    case 'auth/popup-closed-by-user':
+      return 'Se cerró la ventana de Google antes de completar el acceso.';
+    case 'auth/operation-not-supported-in-this-environment':
+      return 'El entorno actual no soporta popup. Probá desde el navegador principal o usá redirección.';
+    default:
+      return 'No se pudo iniciar sesión con Google. Verificá la configuración de Firebase e intentá nuevamente.';
+  }
+};
+
 function App() {
   const upcomingDates = useMemo(() => buildUpcomingDates(7), []);
   const [activeSection, setActiveSection] = useState('landing');
+  const [authView, setAuthView] = useState('login');
+  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoadingState] = useState(false);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [courts, setCourts] = useState([]);
@@ -49,7 +78,6 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [registerData, setRegisterData] = useState(emptyRegister);
-  const [loginData, setLoginData] = useState(emptyLogin);
   const [newCourtName, setNewCourtName] = useState('');
   const [newHoliday, setNewHoliday] = useState('');
 
@@ -58,11 +86,35 @@ function App() {
       setUser(authUser);
       if (!authUser) {
         setProfile(null);
+        setLoading(false);
+        setAuthLoadingState(false);
         return;
       }
-      const userDoc = await getDoc(doc(db, 'users', authUser.uid));
-      if (userDoc.exists()) {
-        setProfile(userDoc.data());
+
+      try {
+        const userRef = doc(db, 'users', authUser.uid);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+          setProfile(userDoc.data());
+        } else {
+          setProfile({
+            firstName: authUser.displayName?.split(' ')[0] || '',
+            lastName: authUser.displayName?.split(' ').slice(1).join(' ') || '',
+            email: authUser.email || '',
+            phone: ''
+          });
+        }
+      } catch {
+        setProfile({
+          firstName: authUser.displayName?.split(' ')[0] || '',
+          lastName: authUser.displayName?.split(' ').slice(1).join(' ') || '',
+          email: authUser.email || '',
+          phone: ''
+        });
+        setAuthError('Sesión iniciada, pero no se pudo leer tu perfil de Firestore. Revisá reglas/permisos.');
+      } finally {
+        setLoading(false);
+        setAuthLoadingState(false);
       }
     });
 
@@ -100,45 +152,72 @@ function App() {
     loadCoreData(selectedDate);
   }, [selectedDate]);
 
-  const registerUser = async (event) => {
-    event.preventDefault();
+  useEffect(() => {
+    if (user && !isProfileComplete(profile)) {
+      setActiveSection('registro');
+      setAuthView('register');
+    }
+  }, [user, profile]);
+
+  const loginWithGoogle = async () => {
+    if (authLoading) return;
+
     setAuthError('');
+    setAuthLoadingState(true);
+
     try {
-      const cred = await createUserWithEmailAndPassword(auth, registerData.email, registerData.password);
-      await setDoc(doc(db, 'users', cred.user.uid), {
-        firstName: registerData.firstName,
-        lastName: registerData.lastName,
-        phone: registerData.phone,
-        email: registerData.email
-      });
-      setRegisterData(emptyRegister);
-      setStatusMessage('Registro exitoso. Ya podés reservar tu turno.');
-    } catch {
-      setAuthError('No se pudo registrar. Revisá los datos ingresados.');
+      setStatusMessage('Redirigiendo a Google para iniciar sesión... Si volvés y seguís en esta pantalla, revisá dominios autorizados en Firebase Auth.');
+      await signInWithRedirect(auth, googleProvider);
+    } catch (error) {
+      setAuthError(getGoogleAuthErrorMessage(error));
+      setAuthLoadingState(false);
     }
   };
 
-  const loginUser = async (event) => {
+  const saveProfile = async (event) => {
     event.preventDefault();
+    if (!user) return;
+
     setAuthError('');
+    const formattedPhone = buildPhone(registerData);
+    if (!registerData.countryCode || !registerData.areaCode || !registerData.phoneNumber) {
+      setAuthError('Completá código de país, código de área y número de teléfono.');
+      return;
+    }
+
     try {
-      await signInWithEmailAndPassword(auth, loginData.email, loginData.password);
-      setLoginData(emptyLogin);
+      const payload = {
+        firstName: registerData.firstName.trim(),
+        lastName: registerData.lastName.trim(),
+        phone: formattedPhone,
+        email: user.email || profile?.email || ''
+      };
+      await setDoc(doc(db, 'users', user.uid), payload, { merge: true });
+      setProfile(payload);
+      setStatusMessage('Perfil guardado. Ya podés reservar tu turno.');
+      setRegisterData(emptyRegister);
     } catch {
-      setAuthError('Credenciales inválidas.');
+      setAuthError('No se pudo guardar tu perfil.');
     }
   };
 
   const logoutUser = async () => {
     await signOut(auth);
+    setStatusMessage('Sesión cerrada.');
+  };
+
+  const goToAuth = (mode) => {
+    setAuthView(mode);
+    setActiveSection('registro');
   };
 
   const bookSlot = async (courtId, hour) => {
-    if (!user) {
-      setStatusMessage('Necesitás iniciar sesión para reservar.');
-      setActiveSection('registro');
+    if (!user || !isProfileComplete(profile)) {
+      setStatusMessage('Necesitás iniciar sesión con Google y completar tus datos para reservar.');
+      goToAuth('register');
       return;
     }
+
     const slotKey = `${courtId}-${hour}`;
     if (bookingsByCourtHour[slotKey]) return;
 
@@ -212,14 +291,29 @@ function App() {
     [courts, schedules, dayIndex]
   );
 
+  const profileDraft = {
+    firstName: registerData.firstName || profile?.firstName || '',
+    lastName: registerData.lastName || profile?.lastName || '',
+    countryCode: registerData.countryCode,
+    areaCode: registerData.areaCode,
+    phoneNumber: registerData.phoneNumber
+  };
+
   return (
     <div className="app">
       <Header />
       <MainNav activeSection={activeSection} onChangeSection={setActiveSection} />
 
       <main>
-        {activeSection === 'landing' && (
+        {loading ? (
+          <section className="card">
+            <p>Cargando datos...</p>
+          </section>
+        ) : null}
+
+        {!loading && activeSection === 'landing' && (
           <LandingPage
+            user={user}
             selectedDate={selectedDate}
             upcomingDates={upcomingDates}
             holidays={holidays}
@@ -227,25 +321,29 @@ function App() {
             bookingsByCourtHour={bookingsByCourtHour}
             onChangeDate={setSelectedDate}
             onBookSlot={bookSlot}
+            onGoLogin={() => goToAuth('login')}
+            onGoRegister={() => goToAuth('register')}
           />
         )}
 
-        {activeSection === 'registro' && (
+        {!loading && activeSection === 'registro' && (
           <AuthPage
             user={user}
             profile={profile}
+            profileDraft={profileDraft}
+            authView={authView}
             authError={authError}
-            loginData={loginData}
-            registerData={registerData}
-            onChangeLogin={(field, value) => setLoginData((prev) => ({ ...prev, [field]: value }))}
-            onChangeRegister={(field, value) => setRegisterData((prev) => ({ ...prev, [field]: value }))}
-            onLogin={loginUser}
-            onRegister={registerUser}
+            onChangeAuthView={setAuthView}
+            onChangeProfileDraft={(field, value) => setRegisterData((prev) => ({ ...prev, [field]: value }))}
+            onLoginWithGoogle={loginWithGoogle}
+            onSaveProfile={saveProfile}
             onLogout={logoutUser}
+            profileComplete={isProfileComplete(profile)}
+            authLoading={authLoading}
           />
         )}
 
-        {activeSection === 'admin' && (
+        {!loading && activeSection === 'admin' && (
           <AdminPage
             courts={courts}
             schedules={schedules}
