@@ -30,11 +30,6 @@ function AdminPage({
   const [activeAdminPanel, setActiveAdminPanel] = useState('canchas');
   const [selectedDayFilter, setSelectedDayFilter] = useState('all');
 
-  const adminUsersById = useMemo(
-    () => Object.fromEntries(adminUsers.map((adminUser) => [adminUser.id, adminUser])),
-    [adminUsers]
-  );
-
   const filteredAdminBookings = useMemo(() => {
     if (selectedDayFilter === 'all') return adminBookings;
 
@@ -317,7 +312,6 @@ function AdminPage({
                         type="button"
                         className="btn-secondary"
                         onClick={() => onRemoveAdmin(adminUser.id)}
-                        disabled={adminUsers.length === 1 && adminUsersById[adminUser.id]}
                       >
                         Quitar admin
                       </button>
