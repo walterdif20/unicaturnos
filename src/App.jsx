@@ -116,6 +116,8 @@ function App() {
         setLoading(false);
         setAuthLoadingState(false);
       }
+      setLoading(false);
+      setAuthLoadingState(false);
     });
 
     return () => unsub();
