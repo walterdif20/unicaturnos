@@ -106,7 +106,7 @@ function App() {
   const [selectedRoleUser, setSelectedRoleUser] = useState(null);
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [manualBookingData, setManualBookingData] = useState(emptyManualBooking);
-  const canAccessAdmin = Boolean(user && profile?.isAdmin);
+  const [editingProfile, setEditingProfile] = useState(false);
 
   const requestConfirmation = (message) => {
     if (typeof window === 'undefined') return true;
@@ -134,6 +134,7 @@ function App() {
       if (!authUser) {
         setProfile(null);
         setMyBookings([]);
+        setEditingProfile(false);
         setLoading(false);
         return;
       }
@@ -234,6 +235,7 @@ function App() {
 
   const goToAuth = (mode) => {
     setAuthView(mode);
+    setEditingProfile(false);
     setActiveSection('registro');
   };
 
@@ -290,6 +292,7 @@ function App() {
       setProfile(payload);
       setRegisterData(emptyRegister);
       setStatusMessage('Cuenta creada correctamente.');
+      setEditingProfile(false);
       setActiveSection('landing');
     } catch {
       setAuthError('No se pudo registrar la cuenta.');
@@ -321,8 +324,7 @@ function App() {
       setProfile(payload);
       setRegisterData(emptyRegister);
       setEditingProfile(false);
-      setStatusMessage('Perfil guardado. Ya podés reservar tu turno.');
-      setActiveSection('landing');
+      setStatusMessage('Perfil guardado correctamente.');
     } catch {
       setAuthError('No se pudo guardar tu perfil.');
     } finally {

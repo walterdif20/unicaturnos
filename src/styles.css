@@ -255,40 +255,6 @@ form {
   gap: 0.5rem;
 }
 
-.field-hint {
-  color: #94a3b8;
-  font-size: 0.82rem;
-}
-
-.password-field {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.45rem;
-  align-items: center;
-}
-
-.password-field input {
-  width: 100%;
-}
-
-.password-toggle {
-  min-width: 72px;
-}
-
-.btn-link {
-  background: transparent;
-  color: #93c5fd;
-  border: 0;
-  padding: 0;
-  text-align: left;
-  font-weight: 600;
-}
-
-.btn-link:hover {
-  transform: none;
-  text-decoration: underline;
-}
-
 
 .profile-form-actions {
   display: flex;
