@@ -250,6 +250,13 @@ form {
   gap: 0.5rem;
 }
 
+
+.profile-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 input {
   background: #0f172a;
   color: #f8fafc;

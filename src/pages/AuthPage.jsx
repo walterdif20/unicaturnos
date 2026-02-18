@@ -15,6 +15,9 @@ function AuthPage({
   onGoogleLogin,
   onSaveProfile,
   onLogout,
+  onStartEditProfile,
+  onCancelEditProfile,
+  editingProfile,
   profileComplete,
   authLoading
 }) {
@@ -168,17 +171,69 @@ function AuthPage({
         </form>
       )}
 
-      {user && profileComplete && (
+      {user && profileComplete && !editingProfile && (
         <div className="profile-summary">
           <p>
             Sesión iniciada como <strong>{`${profile.firstName} ${profile.lastName}`}</strong>
           </p>
           <p>Email: {profile.email}</p>
           <p>Teléfono: {profile.phone}</p>
+          <button type="button" onClick={onStartEditProfile}>
+            Modificar nombre, apellido o teléfono
+          </button>
           <button type="button" className="btn-secondary" onClick={onLogout}>
             Cerrar sesión
           </button>
         </div>
+      )}
+
+      {user && profileComplete && editingProfile && (
+        <form onSubmit={onSaveProfile} className="profile-form">
+          <h3>Editar datos de cuenta</h3>
+          <input
+            type="text"
+            placeholder="Nombre"
+            value={profileDraft.firstName}
+            onChange={(event) => onChangeProfileDraft('firstName', event.target.value)}
+            required
+          />
+          <input
+            type="text"
+            placeholder="Apellido"
+            value={profileDraft.lastName}
+            onChange={(event) => onChangeProfileDraft('lastName', event.target.value)}
+            required
+          />
+          <div className="phone-grid">
+            <input
+              type="tel"
+              placeholder="Código país (54)"
+              value={profileDraft.countryCode}
+              onChange={(event) => onChangeProfileDraft('countryCode', event.target.value.replace(/\D/g, ''))}
+              required
+            />
+            <input
+              type="tel"
+              placeholder="Código área (11)"
+              value={profileDraft.areaCode}
+              onChange={(event) => onChangeProfileDraft('areaCode', event.target.value.replace(/\D/g, ''))}
+              required
+            />
+            <input
+              type="tel"
+              placeholder="Número"
+              value={profileDraft.phoneNumber}
+              onChange={(event) => onChangeProfileDraft('phoneNumber', event.target.value.replace(/\D/g, ''))}
+              required
+            />
+          </div>
+          <div className="profile-form-actions">
+            <button type="submit">Guardar cambios</button>
+            <button type="button" className="btn-secondary" onClick={onCancelEditProfile}>
+              Cancelar
+            </button>
+          </div>
+        </form>
       )}
 
       {authError && <p className="error">{authError}</p>}
