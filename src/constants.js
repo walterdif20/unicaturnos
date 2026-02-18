@@ -15,5 +15,12 @@ export const emptyRegister = {
   lastName: '',
   countryCode: '',
   areaCode: '',
-  phoneNumber: ''
+  phoneNumber: '',
+  email: '',
+  password: ''
+};
+
+export const emptyLogin = {
+  email: '',
+  password: ''
 };

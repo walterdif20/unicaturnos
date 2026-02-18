@@ -203,6 +203,33 @@ function App() {
     }
   };
 
+  const saveProfile = async (event) => {
+    event.preventDefault();
+    if (!user) return;
+
+    setAuthError('');
+    if (!registerData.countryCode || !registerData.areaCode || !registerData.phoneNumber) {
+      setAuthError('Completá código de país, código de área y número de teléfono.');
+      return;
+    }
+
+    try {
+      const payload = {
+        firstName: registerData.firstName.trim(),
+        lastName: registerData.lastName.trim(),
+        phone: buildPhone(registerData),
+        email: user.email || profile?.email || ''
+      };
+      await setDoc(doc(db, 'users', user.uid), payload, { merge: true });
+      setProfile(payload);
+      setRegisterData(emptyRegister);
+      setStatusMessage('Perfil guardado. Ya podés reservar tu turno.');
+      setActiveSection('landing');
+    } catch {
+      setAuthError('No se pudo guardar tu perfil.');
+    }
+  };
+
   const logoutUser = async () => {
     await signOut(auth);
     setStatusMessage('Sesión cerrada.');
@@ -215,8 +242,8 @@ function App() {
 
   const bookSlot = async (courtId, hour) => {
     if (!user || !isProfileComplete(profile)) {
-      setStatusMessage('Necesitás iniciar sesión con Google y completar tus datos para reservar.');
-      goToAuth('register');
+      setStatusMessage('Necesitás iniciar sesión y completar tus datos para reservar.');
+      goToAuth(user ? 'register' : 'login');
       return;
     }
 
@@ -335,13 +362,17 @@ function App() {
             profileDraft={profileDraft}
             authView={authView}
             authError={authError}
+            loginData={loginData}
+            registerData={registerData}
             onChangeAuthView={setAuthView}
+            onChangeLogin={(field, value) => setLoginData((prev) => ({ ...prev, [field]: value }))}
+            onChangeRegister={(field, value) => setRegisterData((prev) => ({ ...prev, [field]: value }))}
             onChangeProfileDraft={(field, value) => setRegisterData((prev) => ({ ...prev, [field]: value }))}
-            onLoginWithGoogle={loginWithGoogle}
+            onLogin={loginUser}
+            onRegister={registerUser}
             onSaveProfile={saveProfile}
             onLogout={logoutUser}
             profileComplete={isProfileComplete(profile)}
-            authLoading={authLoading}
           />
         )}
 
