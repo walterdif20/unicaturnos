@@ -3,6 +3,7 @@ import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithRedirect,
   signOut
@@ -297,6 +298,27 @@ function App() {
       setActiveSection('landing');
     } catch {
       setAuthError('No se pudo registrar la cuenta.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const recoverPassword = async () => {
+    const email = loginData.email.trim();
+    setAuthError('');
+    setStatusMessage('');
+
+    if (!email) {
+      setAuthError('Ingresá tu correo para enviarte el link de recuperación.');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setStatusMessage('Te enviamos un enlace para recuperar tu contraseña. Revisá tu correo.');
+    } catch {
+      setAuthError('No se pudo enviar el correo de recuperación. Verificá el email e intentá de nuevo.');
     } finally {
       setAuthLoading(false);
     }
@@ -782,6 +804,7 @@ function App() {
             onChangeRegister={(field, value) => setRegisterData((prev) => ({ ...prev, [field]: value }))}
             onChangeProfileDraft={(field, value) => setRegisterData((prev) => ({ ...prev, [field]: value }))}
             onLogin={loginUser}
+            onRecoverPassword={recoverPassword}
             onRegister={registerUser}
             onGoogleLogin={loginWithGoogle}
             onSaveProfile={saveProfile}

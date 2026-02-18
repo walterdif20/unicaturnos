@@ -13,6 +13,7 @@ function AuthPage({
   onChangeRegister,
   onChangeProfileDraft,
   onLogin,
+  onRecoverPassword,
   onRegister,
   onGoogleLogin,
   onSaveProfile,
@@ -86,6 +87,9 @@ function AuthPage({
               </div>
               <button type="submit" disabled={authLoading}>
                 {authLoading ? 'Ingresando…' : 'Iniciar sesión'}
+              </button>
+              <button type="button" className="btn-link" onClick={onRecoverPassword} disabled={authLoading}>
+                Olvidé mi contraseña
               </button>
               <button type="button" className="btn-link" onClick={() => onChangeAuthView('register')}>
                 ¿No tenés cuenta? Registrate
