@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { DEFAULT_SCHEDULE, emptyLogin, emptyRegister } from './constants';
-import { buildUpcomingDates, isPastSlotInArgentina, toLocalDate } from './utils/date';
+import { buildUpcomingDates, isPastSlotInArgentina, isTooLateToCancelInArgentina, toLocalDate } from './utils/date';
 import Header from './components/Header';
 import MainNav from './components/MainNav';
 import BookingPage from './pages/BookingPage';
@@ -617,9 +617,16 @@ function App() {
     }
   };
 
-  const cancelBooking = async (bookingId) => {
+  const cancelBooking = async (booking) => {
+    if (!booking?.id) return;
+
+    if (isTooLateToCancelInArgentina(booking.date, booking.hour)) {
+      setStatusMessage('Es muy tarde para cancelar el turno.');
+      return;
+    }
+
     if (!requestConfirmation('¿Estás seguro de que querés cancelar esta reserva?')) return;
-    await deleteDoc(doc(db, 'bookings', bookingId));
+    await deleteDoc(doc(db, 'bookings', booking.id));
     setStatusMessage('Reserva cancelada correctamente.');
     await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
   };

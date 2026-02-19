@@ -51,3 +51,13 @@ export const isPastSlotInArgentina = (isoDate, hour) => {
 
   return hour < now.hour || (hour === now.hour && now.minute > 0);
 };
+
+export const isTooLateToCancelInArgentina = (isoDate, hour) => {
+  const now = getArgentinaNow();
+
+  if (isoDate < now.date) return true;
+  if (isoDate > now.date) return false;
+
+  const remainingMinutes = hour * 60 - (now.hour * 60 + now.minute);
+  return remainingMinutes <= 60;
+};
