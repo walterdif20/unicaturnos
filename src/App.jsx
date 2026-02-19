@@ -543,6 +543,97 @@ function App() {
     await loadFixedBookings(user?.uid, canAccessAdmin);
   };
 
+  const createFixedBookingFromBooking = async (booking) => {
+    if (!user || !booking?.id) return;
+
+    if (booking.source === 'fixed' && booking.fixedId) {
+      setStatusMessage('Este turno ya pertenece a un turno fijo.');
+      return;
+    }
+
+    const weekday = new Date(`${booking.date}T00:00:00`).getDay();
+    const existing = fixedBookings.find(
+      (entry) => entry.userId === user.uid && entry.courtId === booking.courtId && entry.hour === booking.hour && entry.weekday === weekday && entry.status !== 'cancelled'
+    );
+
+    if (existing) {
+      setStatusMessage('Ya tenés un turno fijo activo o pausado para ese día y horario.');
+      return;
+    }
+
+    if (!requestConfirmation('¿Querés convertir este turno en fijo semanal?')) return;
+
+    const fixedRef = await addDoc(collection(db, 'fixedBookings'), {
+      userId: user.uid,
+      userName: booking.userName,
+      userPhone: booking.userPhone,
+      courtId: booking.courtId,
+      weekday,
+      hour: booking.hour,
+      status: 'active',
+      startDate: booking.date,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    const fixedPayload = {
+      id: fixedRef.id,
+      userId: user.uid,
+      userName: booking.userName,
+      userPhone: booking.userPhone,
+      courtId: booking.courtId,
+      weekday,
+      hour: booking.hour,
+      status: 'active',
+      startDate: booking.date
+    };
+
+    await setDoc(doc(db, 'bookings', booking.id), { source: 'fixed', fixedId: fixedRef.id }, { merge: true });
+    await ensureFixedBookingOccurrences(fixedPayload);
+    await loadCoreData(selectedDate);
+    await loadMyBookings(user.uid);
+    setStatusMessage('Turno fijo creado. Vamos a ir generando tus próximos turnos semanales.');
+  };
+
+  const updateFixedBookingStatus = async (fixedBookingId, nextStatus) => {
+    if (!fixedBookingId) {
+      setStatusMessage('No se pudo identificar el turno fijo a actualizar.');
+      return;
+    }
+    if (!['active', 'paused', 'cancelled'].includes(nextStatus)) {
+      setStatusMessage('Estado de turno fijo inválido.');
+      return;
+    }
+
+    await setDoc(doc(db, 'fixedBookings', fixedBookingId), { status: nextStatus, updatedAt: serverTimestamp() }, { merge: true });
+
+    if (nextStatus === 'active') {
+      const updatedDoc = await getDoc(doc(db, 'fixedBookings', fixedBookingId));
+      if (updatedDoc.exists()) {
+        await ensureFixedBookingOccurrences({ id: fixedBookingId, ...updatedDoc.data() });
+      }
+    }
+
+    await loadFixedBookings(user?.uid, canAccessAdmin);
+    await loadCoreData(selectedDate);
+    if (user?.uid) await loadMyBookings(user.uid);
+  };
+
+  const cancelFixedBooking = async (fixedBookingId) => {
+    if (!fixedBookingId) {
+      setStatusMessage('No se pudo identificar el turno fijo a cancelar.');
+      return;
+    }
+    if (!requestConfirmation('¿Querés cancelar definitivamente este turno fijo?')) return;
+    await setDoc(
+      doc(db, 'fixedBookings', fixedBookingId),
+      { status: 'cancelled', cancelledBy: canAccessAdmin ? 'admin' : 'user', updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    setStatusMessage('Turno fijo cancelado.');
+    await loadFixedBookings(user?.uid, canAccessAdmin);
+  };
+
   const cancelBookingFromAdmin = async (bookingId) => {
     if (!requestConfirmation('¿Estás seguro de que querés cancelar este turno?')) return;
     await deleteDoc(doc(db, 'bookings', bookingId));
