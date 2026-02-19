@@ -669,3 +669,17 @@ li {
 .beelup-link:hover {
   transform: translateY(-1px);
 }
+
+
+.booking-item-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.fixed-bookings-section {
+  border-top: 1px solid #334155;
+  padding-top: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+}
