@@ -80,3 +80,8 @@ firebase deploy --only firestore:rules
 - `schedules/{courtId}`: mapa por día (`0..6`) con `open` y `close`
 - `settings/holidays`: `dates: string[]` en formato `YYYY-MM-DD`
 - `bookings/{bookingId}`: `courtId`, `date`, `hour`, `userId`, `userName`, `userPhone`, `createdAt`
+
+## Diseño funcional
+
+- Propuesta de implementación de turnos fijos (cliente + administración): `docs/turnos-fijos.md`.
+
