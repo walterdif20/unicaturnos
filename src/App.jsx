@@ -330,11 +330,53 @@ function App() {
     loadCoreData(selectedDate);
   }, [selectedDate]);
 
-  const cancelBooking = async (bookingId) => {
-    if (!requestConfirmation('¿Estás seguro de que querés cancelar esta reserva?')) return;
-    await deleteDoc(doc(db, 'bookings', bookingId));
-    setStatusMessage('Reserva cancelada correctamente.');
-    await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
+  const bookSlot = async (courtId, hour) => {
+    if (bookingInProgress) return;
+
+    if (!user || !isProfileComplete(profile)) {
+      setStatusMessage('Necesitás iniciar sesión y completar tus datos para reservar.');
+      goToAuth(user ? 'register' : 'login');
+      return;
+    }
+
+    const slotKey = `${courtId}-${hour}`;
+    if (bookingsByCourtHour[slotKey]) return;
+
+    if (isPastSlotInArgentina(selectedDate, hour)) {
+      setStatusMessage('Ese horario ya pasó según la hora de Argentina (GMT-3).');
+      return;
+    }
+
+    const alreadyBookedInDate = Object.values(bookingsByCourtHour).some((booking) => booking.userId === user.uid);
+    if (alreadyBookedInDate) {
+      setStatusMessage('Solo podés reservar un turno por día. Cancelá tu reserva actual para tomar otro horario.');
+      setActiveSection('mis-reservas');
+      return;
+    }
+
+    await setDoc(doc(db, 'fixedBookings', fixedId), { status: nextStatus, updatedAt: serverTimestamp() }, { merge: true });
+
+    if (nextStatus === 'active') {
+      const updatedDoc = await getDoc(doc(db, 'fixedBookings', fixedId));
+      if (updatedDoc.exists()) {
+        await ensureFixedBookingOccurrences({ id: fixedId, ...updatedDoc.data() });
+      }
+    }
+
+    await loadFixedBookings(user?.uid, canAccessAdmin);
+    await loadCoreData(selectedDate);
+    if (user?.uid) await loadMyBookings(user.uid);
+  };
+
+  const cancelFixedBooking = async (fixedId) => {
+    if (!requestConfirmation('¿Querés cancelar definitivamente este turno fijo?')) return;
+    await setDoc(
+      doc(db, 'fixedBookings', fixedId),
+      { status: 'cancelled', cancelledBy: canAccessAdmin ? 'admin' : 'user', updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    setStatusMessage('Turno fijo cancelado.');
+    await loadFixedBookings(user?.uid, canAccessAdmin);
   };
 
   const createFixedBookingFromBooking = async (booking) => {
