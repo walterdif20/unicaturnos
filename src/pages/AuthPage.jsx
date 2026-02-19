@@ -100,32 +100,19 @@ function AuthPage({
               <h3>Crear cuenta</h3>
               <input
                 type="text"
-                placeholder="Nombre"
-                value={registerData.firstName}
-                onChange={(event) => onChangeRegister('firstName', event.target.value)}
-                autoComplete="given-name"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Apellido"
-                value={registerData.lastName}
-                onChange={(event) => onChangeRegister('lastName', event.target.value)}
-                autoComplete="family-name"
+                placeholder="Nombre y apellido"
+                value={registerData.fullName}
+                onChange={(event) => onChangeRegister('fullName', event.target.value)}
+                autoComplete="name"
                 required
               />
               <div className="phone-grid">
+                <select value={registerData.countryCode} onChange={(event) => onChangeRegister('countryCode', event.target.value)} required>
+                  <option value="54">54 AR</option>
+                </select>
                 <input
                   type="tel"
-                  placeholder="Código país (54)"
-                  value={registerData.countryCode}
-                  onChange={(event) => onChangeRegister('countryCode', event.target.value.replace(/\D/g, ''))}
-                  inputMode="numeric"
-                  required
-                />
-                <input
-                  type="tel"
-                  placeholder="Código área (11)"
+                  placeholder="Código área (2262)"
                   value={registerData.areaCode}
                   onChange={(event) => onChangeRegister('areaCode', event.target.value.replace(/\D/g, ''))}
                   inputMode="numeric"
@@ -140,7 +127,7 @@ function AuthPage({
                   required
                 />
               </div>
-              <small className="field-hint">Ejemplo: +54 11 12345678</small>
+              <small className="field-hint">Ejemplo: +54 2262 12345678</small>
               <input
                 type="email"
                 placeholder="Correo electrónico"
@@ -183,29 +170,18 @@ function AuthPage({
           <h3>Completá tu perfil</h3>
           <input
             type="text"
-            placeholder="Nombre"
-            value={profileDraft.firstName}
-            onChange={(event) => onChangeProfileDraft('firstName', event.target.value)}
-            required
-          />
-          <input
-            type="text"
-            placeholder="Apellido"
-            value={profileDraft.lastName}
-            onChange={(event) => onChangeProfileDraft('lastName', event.target.value)}
+            placeholder="Nombre y apellido"
+            value={profileDraft.fullName}
+            onChange={(event) => onChangeProfileDraft('fullName', event.target.value)}
             required
           />
           <div className="phone-grid">
+            <select value={profileDraft.countryCode} onChange={(event) => onChangeProfileDraft('countryCode', event.target.value)} required>
+              <option value="54">54 AR</option>
+            </select>
             <input
               type="tel"
-              placeholder="Código país (54)"
-              value={profileDraft.countryCode}
-              onChange={(event) => onChangeProfileDraft('countryCode', event.target.value.replace(/\D/g, ''))}
-              required
-            />
-            <input
-              type="tel"
-              placeholder="Código área (11)"
+              placeholder="Código área (2262)"
               value={profileDraft.areaCode}
               onChange={(event) => onChangeProfileDraft('areaCode', event.target.value.replace(/\D/g, ''))}
               required
@@ -243,29 +219,18 @@ function AuthPage({
           <h3>Editar datos de cuenta</h3>
           <input
             type="text"
-            placeholder="Nombre"
-            value={profileDraft.firstName}
-            onChange={(event) => onChangeProfileDraft('firstName', event.target.value)}
-            required
-          />
-          <input
-            type="text"
-            placeholder="Apellido"
-            value={profileDraft.lastName}
-            onChange={(event) => onChangeProfileDraft('lastName', event.target.value)}
+            placeholder="Nombre y apellido"
+            value={profileDraft.fullName}
+            onChange={(event) => onChangeProfileDraft('fullName', event.target.value)}
             required
           />
           <div className="phone-grid">
+            <select value={profileDraft.countryCode} onChange={(event) => onChangeProfileDraft('countryCode', event.target.value)} required>
+              <option value="54">54 AR</option>
+            </select>
             <input
               type="tel"
-              placeholder="Código país (54)"
-              value={profileDraft.countryCode}
-              onChange={(event) => onChangeProfileDraft('countryCode', event.target.value.replace(/\D/g, ''))}
-              required
-            />
-            <input
-              type="tel"
-              placeholder="Código área (11)"
+              placeholder="Código área (2262)"
               value={profileDraft.areaCode}
               onChange={(event) => onChangeProfileDraft('areaCode', event.target.value.replace(/\D/g, ''))}
               required

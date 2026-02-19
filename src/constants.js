@@ -11,9 +11,8 @@ export const DEFAULT_SCHEDULE = {
 };
 
 export const emptyRegister = {
-  firstName: '',
-  lastName: '',
-  countryCode: '',
+  fullName: '',
+  countryCode: '54',
   areaCode: '',
   phoneNumber: '',
   email: '',

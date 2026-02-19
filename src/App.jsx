@@ -63,15 +63,26 @@ const parsePhone = (phone = '') => {
   }
 
   return {
-    countryCode: '',
+    countryCode: '54',
     areaCode: '',
     phoneNumber: normalizedPhone.replace(/\D/g, '')
   };
 };
 
-const isProfileComplete = (profile) => Boolean(profile?.firstName && profile?.lastName && profile?.phone);
+const isProfileComplete = (profile) => Boolean(profile?.firstName && profile?.phone);
 
 const buildConfirmationToken = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const splitFullName = (fullName = '') => {
+  const normalized = fullName.trim().replace(/\s+/g, ' ');
+  if (!normalized) return { firstName: '', lastName: '' };
+
+  const [firstName, ...lastNameParts] = normalized.split(' ');
+  return {
+    firstName,
+    lastName: lastNameParts.join(' ')
+  };
+};
 
 const getFirebaseAuthErrorMessage = (error, fallbackMessage) => {
   const errorCode = error?.code || '';
@@ -324,6 +335,12 @@ function App() {
 
     try {
       const phone = buildPhone(registerData);
+      const { firstName, lastName } = splitFullName(registerData.fullName);
+
+      if (!firstName) {
+        setAuthError('Completá tu nombre y apellido.');
+        return;
+      }
 
       if (await phoneAlreadyExists(phone)) {
         setAuthError('Ese teléfono ya está registrado. Usá otro número o iniciá sesión.');
@@ -332,8 +349,8 @@ function App() {
 
       const credentials = await createUserWithEmailAndPassword(auth, registerData.email, registerData.password);
       const payload = {
-        firstName: registerData.firstName.trim(),
-        lastName: registerData.lastName.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         phone,
         email: registerData.email.trim()
       };
@@ -387,9 +404,15 @@ function App() {
     setAuthLoading(true);
 
     try {
+      const { firstName, lastName } = splitFullName(registerData.fullName);
+      if (!firstName) {
+        setAuthError('Completá tu nombre y apellido.');
+        return;
+      }
+
       const payload = {
-        firstName: registerData.firstName.trim(),
-        lastName: registerData.lastName.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         phone: buildPhone(registerData),
         email: user.email || profile?.email || ''
       };
@@ -415,8 +438,7 @@ function App() {
     const parsedPhone = parsePhone(profile?.phone || '');
     setRegisterData((prev) => ({
       ...prev,
-      firstName: profile?.firstName || '',
-      lastName: profile?.lastName || '',
+      fullName: `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim(),
       countryCode: parsedPhone.countryCode,
       areaCode: parsedPhone.areaCode,
       phoneNumber: parsedPhone.phoneNumber
@@ -781,9 +803,8 @@ function App() {
   const parsedProfilePhone = parsePhone(profile?.phone || '');
 
   const profileDraft = {
-    firstName: registerData.firstName || profile?.firstName || '',
-    lastName: registerData.lastName || profile?.lastName || '',
-    countryCode: registerData.countryCode || parsedProfilePhone.countryCode,
+    fullName: registerData.fullName || `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim(),
+    countryCode: registerData.countryCode || parsedProfilePhone.countryCode || '54',
     areaCode: registerData.areaCode || parsedProfilePhone.areaCode,
     phoneNumber: registerData.phoneNumber || parsedProfilePhone.phoneNumber
   };
