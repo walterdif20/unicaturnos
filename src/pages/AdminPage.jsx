@@ -34,11 +34,22 @@ function AdminPage({
   onCreateManualBooking,
   manualBookableDates,
   manualBookableCourts,
-  manualBookableHours
+  manualBookableHours,
+  fixedBookings,
+  onUpdateFixedStatus,
+  onCancelFixedBooking
 }) {
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const [activeAdminPanel, setActiveAdminPanel] = useState('canchas');
   const [selectedDayFilter, setSelectedDayFilter] = useState('all');
+  const [fixedDayFilter, setFixedDayFilter] = useState('all');
+
+
+
+  const fixedBookingsForAdmin = useMemo(() => {
+    if (fixedDayFilter === 'all') return fixedBookings;
+    return fixedBookings.filter((booking) => Number(booking.weekday) === Number(fixedDayFilter));
+  }, [fixedBookings, fixedDayFilter]);
 
   const filteredAdminBookings = useMemo(() => {
     if (selectedDayFilter === 'all') return adminBookings;
@@ -276,6 +287,81 @@ function AdminPage({
                   Cargar turno manual
                 </button>
               </form>
+            </section>
+
+
+
+            <section className="manual-booking-card">
+              <h4>Turnos fijos</h4>
+              <div className="day-filter-buttons" role="group" aria-label="Filtrar turnos fijos por día de la semana">
+                <button
+                  type="button"
+                  className={fixedDayFilter === 'all' ? 'nav-pill nav-pill-active' : 'nav-pill'}
+                  onClick={() => setFixedDayFilter('all')}
+                >
+                  Todos
+                </button>
+                {DEFAULT_DAYS.map((day, dayIndex) => (
+                  <button
+                    key={`fixed-${day}`}
+                    type="button"
+                    className={fixedDayFilter === String(dayIndex) ? 'nav-pill nav-pill-active' : 'nav-pill'}
+                    onClick={() => setFixedDayFilter(String(dayIndex))}
+                  >
+                    {day}
+                  </button>
+                ))}
+              </div>
+              <div className="admin-table-wrapper">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Cancha</th>
+                      <th>Día</th>
+                      <th>Hora</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fixedBookingsForAdmin.length === 0 ? (
+                      <tr>
+                        <td colSpan={6}>No hay turnos fijos.</td>
+                      </tr>
+                    ) : (
+                      fixedBookingsForAdmin.map((fixedBooking) => {
+                        const courtName = courts.find((court) => court.id === fixedBooking.courtId)?.name || fixedBooking.courtId;
+                        return (
+                          <tr key={fixedBooking.id}>
+                            <td data-label="Cliente">{fixedBooking.userName || '-'}</td>
+                            <td data-label="Cancha">{courtName}</td>
+                            <td data-label="Día">{DEFAULT_DAYS[fixedBooking.weekday] || '-'}</td>
+                            <td data-label="Hora">{fixedBooking.hour}:00</td>
+                            <td data-label="Estado">{fixedBooking.status}</td>
+                            <td data-label="Acciones">
+                              {fixedBooking.status === 'active' ? (
+                                <button type="button" className="btn-secondary" onClick={() => onUpdateFixedStatus(fixedBooking.id, 'paused')}>
+                                  Pausar
+                                </button>
+                              ) : fixedBooking.status === 'paused' ? (
+                                <button type="button" className="btn-secondary" onClick={() => onUpdateFixedStatus(fixedBooking.id, 'active')}>
+                                  Reactivar
+                                </button>
+                              ) : null}
+                              {fixedBooking.status !== 'cancelled' && (
+                                <button type="button" className="btn-cancel" onClick={() => onCancelFixedBooking(fixedBooking.id)}>
+                                  Cancelar
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </section>
 
             <div className="day-filter-buttons" role="group" aria-label="Filtrar turnos por día de la semana">
