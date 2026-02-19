@@ -57,7 +57,7 @@ function MyBookingsPage({
                     Hacer fijo
                   </button>
                 )}
-                <button type="button" className="btn-secondary" onClick={() => onCancelBooking(booking.id)}>
+                <button type="button" className="btn-secondary" onClick={() => onCancelBooking(booking)}>
                   Cancelar
                 </button>
               </div>
