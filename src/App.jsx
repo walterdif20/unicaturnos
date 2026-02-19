@@ -113,6 +113,7 @@ const emptyManualBooking = {
 };
 
 const DEFAULT_COURT_PRICE = 58800;
+const FIXED_BOOKING_WEEKS_AHEAD = 4;
 
 const parseCourtPrice = (value) => {
   const normalizedValue = Number(value);
@@ -134,6 +135,7 @@ function App() {
   const [bookingsByCourtHour, setBookingsByCourtHour] = useState({});
   const [adminBookings, setAdminBookings] = useState([]);
   const [myBookings, setMyBookings] = useState([]);
+  const [fixedBookings, setFixedBookings] = useState([]);
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = toLocalDate(new Date());
     return upcomingDates.includes(today) ? today : upcomingDates[0];
@@ -175,6 +177,67 @@ function App() {
     setMyBookings(bookings);
   };
 
+  const loadFixedBookings = async (uid, isAdminView = false) => {
+    if (!uid && !isAdminView) {
+      setFixedBookings([]);
+      return;
+    }
+
+    const fixedBookingsQuery = isAdminView
+      ? collection(db, 'fixedBookings')
+      : query(collection(db, 'fixedBookings'), where('userId', '==', uid));
+
+    const fixedBookingsSnapshot = await getDocs(fixedBookingsQuery);
+    const fixedData = fixedBookingsSnapshot.docs
+      .map((item) => ({ id: item.id, ...item.data() }))
+      .sort((a, b) => `${a.weekday || 0}-${a.hour || 0}`.localeCompare(`${b.weekday || 0}-${b.hour || 0}`));
+
+    setFixedBookings(fixedData);
+  };
+
+  const ensureFixedBookingOccurrences = async (fixedBooking) => {
+    if (!fixedBooking || fixedBooking.status !== 'active') return;
+
+    const startDate = new Date(`${fixedBooking.startDate}T00:00:00`);
+    if (Number.isNaN(startDate.getTime())) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let weekOffset = 0; weekOffset < FIXED_BOOKING_WEEKS_AHEAD; weekOffset += 1) {
+      const occurrenceDate = new Date(today);
+      occurrenceDate.setDate(today.getDate() + weekOffset * 7);
+
+      const dayDifference = (fixedBooking.weekday - occurrenceDate.getDay() + 7) % 7;
+      occurrenceDate.setDate(occurrenceDate.getDate() + dayDifference);
+
+      if (occurrenceDate < startDate) continue;
+
+      const isoDate = toLocalDate(occurrenceDate);
+      if (fixedBooking.endDate && isoDate > fixedBooking.endDate) continue;
+      if (isPastSlotInArgentina(isoDate, fixedBooking.hour)) continue;
+
+      const bookingId = `${isoDate}_${fixedBooking.courtId}_${fixedBooking.hour}`;
+      const bookingRef = doc(db, 'bookings', bookingId);
+      const existingBooking = await getDoc(bookingRef);
+      if (existingBooking.exists()) continue;
+
+      await setDoc(bookingRef, {
+        courtId: fixedBooking.courtId,
+        hour: fixedBooking.hour,
+        date: isoDate,
+        userId: fixedBooking.userId,
+        userName: fixedBooking.userName,
+        userPhone: fixedBooking.userPhone,
+        status: 'reservado',
+        source: 'fixed',
+        fixedId: fixedBooking.id,
+        confirmationToken: buildConfirmationToken(),
+        createdAt: serverTimestamp()
+      });
+    }
+  };
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (authUser) => {
       setUser(authUser);
@@ -183,6 +246,7 @@ function App() {
       if (!authUser) {
         setProfile(null);
         setMyBookings([]);
+        setFixedBookings([]);
         setEditingProfile(false);
         setLoading(false);
         return;
@@ -201,6 +265,7 @@ function App() {
           });
         }
         await loadMyBookings(authUser.uid);
+        await loadFixedBookings(authUser.uid, Boolean(userDoc.data()?.isAdmin));
       } catch {
         setAuthError('Sesión iniciada, pero no se pudo leer tu perfil.');
       } finally {
@@ -255,273 +320,101 @@ function App() {
       .sort((a, b) => a.email.localeCompare(b.email));
     setAllUsers(usersData);
     setAdminUsers(usersData.filter((entry) => entry.isAdmin));
+
+    if (user?.uid) {
+      await loadFixedBookings(user.uid, Boolean(usersData.find((entry) => entry.id === user.uid)?.isAdmin));
+    }
   };
 
   useEffect(() => {
     loadCoreData(selectedDate);
   }, [selectedDate]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const bookingId = params.get('confirmBooking');
-    const token = params.get('token');
-
-    if (!bookingId || !token) {
-      setPendingConfirmation(null);
-      return;
-    }
-
-    setPendingConfirmation({ bookingId, token });
-  }, []);
-
-  useEffect(() => {
-    if (user && !isProfileComplete(profile)) {
-      setActiveSection('registro');
-      setAuthView('register');
-    }
-  }, [user, profile]);
-
-  useEffect(() => {
-    if (!canAccessAdmin && activeSection === 'admin') {
-      setActiveSection('reservas');
-    }
-  }, [activeSection, canAccessAdmin]);
-
-  const goToAuth = (mode) => {
-    setAuthView(mode);
-    setEditingProfile(false);
-    setActiveSection('registro');
-  };
-
-  const loginWithGoogle = async () => {
-    if (authLoading) return;
-    setAuthError('');
-    setAuthLoading(true);
-    try {
-      await signInWithRedirect(auth, googleProvider);
-    } catch (error) {
-      setAuthError(getFirebaseAuthErrorMessage(error, 'No se pudo iniciar sesión con Google.'));
-      setAuthLoading(false);
-    }
-  };
-
-  const loginUser = async (event) => {
-    event.preventDefault();
-    setAuthError('');
-    setAuthLoading(true);
-
-    try {
-      await signInWithEmailAndPassword(auth, loginData.email, loginData.password);
-      setLoginData(emptyLogin);
-      setStatusMessage('Sesión iniciada.');
-      setActiveSection('reservas');
-    } catch (error) {
-      setAuthError(getFirebaseAuthErrorMessage(error, 'No se pudo iniciar sesión. Verificá tus credenciales.'));
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const registerUser = async (event) => {
-    event.preventDefault();
-    setAuthError('');
-
-    if (!registerData.countryCode || !registerData.areaCode || !registerData.phoneNumber) {
-      setAuthError('Completá código de país, código de área y número de teléfono.');
-      return;
-    }
-
-    setAuthLoading(true);
-
-    try {
-      const phone = buildPhone(registerData);
-      const { firstName, lastName } = splitFullName(registerData.fullName);
-
-      if (!firstName) {
-        setAuthError('Completá tu nombre y apellido.');
-        return;
-      }
-
-      if (await phoneAlreadyExists(phone)) {
-        setAuthError('Ese teléfono ya está registrado. Usá otro número o iniciá sesión.');
-        return;
-      }
-
-      const credentials = await createUserWithEmailAndPassword(auth, registerData.email, registerData.password);
-      const payload = {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone,
-        email: registerData.email.trim()
-      };
-
-      await setDoc(doc(db, 'users', credentials.user.uid), payload, { merge: true });
-      setProfile(payload);
-      setRegisterData(emptyRegister);
-      setStatusMessage('Cuenta creada correctamente.');
-      setEditingProfile(false);
-      setActiveSection('reservas');
-    } catch (error) {
-      setAuthError(getFirebaseAuthErrorMessage(error, 'No se pudo registrar la cuenta.'));
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const recoverPassword = async () => {
-    const email = loginData.email.trim();
-    setAuthError('');
-    setStatusMessage('');
-
-    if (!email) {
-      setAuthError('Ingresá tu correo para enviarte el link de recuperación.');
-      return;
-    }
-
-    setAuthLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setStatusMessage('Te enviamos un enlace para recuperar tu contraseña. Revisá tu correo.');
-    } catch (error) {
-      setAuthError(
-        getFirebaseAuthErrorMessage(error, 'No se pudo enviar el correo de recuperación. Verificá el email e intentá de nuevo.')
-      );
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const saveProfile = async (event) => {
-    event.preventDefault();
-    if (!user) return;
-
-    setAuthError('');
-    if (!registerData.countryCode || !registerData.areaCode || !registerData.phoneNumber) {
-      setAuthError('Completá código de país, código de área y número de teléfono.');
-      return;
-    }
-
-    setAuthLoading(true);
-
-    try {
-      const { firstName, lastName } = splitFullName(registerData.fullName);
-      if (!firstName) {
-        setAuthError('Completá tu nombre y apellido.');
-        return;
-      }
-
-      const payload = {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: buildPhone(registerData),
-        email: user.email || profile?.email || ''
-      };
-      await setDoc(doc(db, 'users', user.uid), payload, { merge: true });
-      setProfile(payload);
-      setRegisterData(emptyRegister);
-      setEditingProfile(false);
-      setStatusMessage('Perfil guardado correctamente.');
-    } catch {
-      setAuthError('No se pudo guardar tu perfil.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const logoutUser = async () => {
-    if (!requestConfirmation('¿Estás seguro de que querés cerrar sesión?')) return;
-    await signOut(auth);
-    setStatusMessage('Sesión cerrada.');
-  };
-
-  const startEditingProfile = () => {
-    const parsedPhone = parsePhone(profile?.phone || '');
-    setRegisterData((prev) => ({
-      ...prev,
-      fullName: `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim(),
-      countryCode: parsedPhone.countryCode,
-      areaCode: parsedPhone.areaCode,
-      phoneNumber: parsedPhone.phoneNumber
-    }));
-    setAuthError('');
-    setEditingProfile(true);
-  };
-
-  const cancelEditingProfile = () => {
-    setRegisterData(emptyRegister);
-    setAuthError('');
-    setEditingProfile(false);
-  };
-
-  const bookSlot = async (courtId, hour) => {
-    if (bookingInProgress) return;
-
-    if (!user || !isProfileComplete(profile)) {
-      setStatusMessage('Necesitás iniciar sesión y completar tus datos para reservar.');
-      goToAuth(user ? 'register' : 'login');
-      return;
-    }
-
-    const slotKey = `${courtId}-${hour}`;
-    if (bookingsByCourtHour[slotKey]) return;
-
-    if (isPastSlotInArgentina(selectedDate, hour)) {
-      setStatusMessage('Ese horario ya pasó según la hora de Argentina (GMT-3).');
-      return;
-    }
-
-    const alreadyBookedInDate = Object.values(bookingsByCourtHour).some((booking) => booking.userId === user.uid);
-    if (alreadyBookedInDate) {
-      setStatusMessage('Solo podés reservar un turno por día. Cancelá tu reserva actual para tomar otro horario.');
-      setActiveSection('mis-reservas');
-      return;
-    }
-
-    if (!requestConfirmation(`¿Estás seguro de que querés reservar el turno de las ${hour}:00?`)) return;
-
-    setBookingInProgress(true);
-    try {
-      await runTransaction(db, async (transaction) => {
-        const bookingId = `${selectedDate}_${courtId}_${hour}`;
-        const bookingRef = doc(db, 'bookings', bookingId);
-        const existingBooking = await transaction.get(bookingRef);
-
-        if (existingBooking.exists()) {
-          throw new Error('SLOT_ALREADY_BOOKED');
-        }
-
-        transaction.set(bookingRef, {
-          courtId,
-          hour,
-          date: selectedDate,
-          userId: user.uid,
-          userName: `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim(),
-          userPhone: profile?.phone || '',
-          status: 'reservado',
-          confirmationToken: buildConfirmationToken(),
-          createdAt: serverTimestamp()
-        });
-      });
-
-      setStatusMessage(`Turno reservado para las ${hour}:00.`);
-      await Promise.all([loadCoreData(selectedDate), loadMyBookings(user.uid)]);
-    } catch (error) {
-      if (error instanceof Error && error.message === 'SLOT_ALREADY_BOOKED') {
-        setStatusMessage('Ese turno ya fue reservado por otra persona. Elegí otro horario.');
-      } else {
-        setStatusMessage('No se pudo reservar el turno. Intentá nuevamente.');
-      }
-      await loadCoreData(selectedDate);
-    } finally {
-      setBookingInProgress(false);
-    }
-  };
-
   const cancelBooking = async (bookingId) => {
     if (!requestConfirmation('¿Estás seguro de que querés cancelar esta reserva?')) return;
     await deleteDoc(doc(db, 'bookings', bookingId));
     setStatusMessage('Reserva cancelada correctamente.');
     await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
+  };
+
+  const createFixedBookingFromBooking = async (booking) => {
+    if (!user || !booking?.id) return;
+
+    if (booking.source === 'fixed' && booking.fixedId) {
+      setStatusMessage('Este turno ya pertenece a un turno fijo.');
+      return;
+    }
+
+    const weekday = new Date(`${booking.date}T00:00:00`).getDay();
+    const existing = fixedBookings.find(
+      (entry) => entry.userId === user.uid && entry.courtId === booking.courtId && entry.hour === booking.hour && entry.weekday === weekday && entry.status !== 'cancelled'
+    );
+
+    if (existing) {
+      setStatusMessage('Ya tenés un turno fijo activo o pausado para ese día y horario.');
+      return;
+    }
+
+    if (!requestConfirmation('¿Querés convertir este turno en fijo semanal?')) return;
+
+    const fixedRef = await addDoc(collection(db, 'fixedBookings'), {
+      userId: user.uid,
+      userName: booking.userName,
+      userPhone: booking.userPhone,
+      courtId: booking.courtId,
+      weekday,
+      hour: booking.hour,
+      status: 'active',
+      startDate: booking.date,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    const fixedPayload = {
+      id: fixedRef.id,
+      userId: user.uid,
+      userName: booking.userName,
+      userPhone: booking.userPhone,
+      courtId: booking.courtId,
+      weekday,
+      hour: booking.hour,
+      status: 'active',
+      startDate: booking.date
+    };
+
+    await setDoc(doc(db, 'bookings', booking.id), { source: 'fixed', fixedId: fixedRef.id }, { merge: true });
+    await ensureFixedBookingOccurrences(fixedPayload);
+    await loadCoreData(selectedDate);
+    await loadMyBookings(user.uid);
+    setStatusMessage('Turno fijo creado. Vamos a ir generando tus próximos turnos semanales.');
+  };
+
+  const updateFixedBookingStatus = async (fixedId, nextStatus) => {
+    if (!fixedId) return;
+
+    await setDoc(doc(db, 'fixedBookings', fixedId), { status: nextStatus, updatedAt: serverTimestamp() }, { merge: true });
+
+    if (nextStatus === 'active') {
+      const updatedDoc = await getDoc(doc(db, 'fixedBookings', fixedId));
+      if (updatedDoc.exists()) {
+        await ensureFixedBookingOccurrences({ id: fixedId, ...updatedDoc.data() });
+      }
+    }
+
+    await loadFixedBookings(user?.uid, canAccessAdmin);
+    await loadCoreData(selectedDate);
+    if (user?.uid) await loadMyBookings(user.uid);
+  };
+
+  const cancelFixedBooking = async (fixedId) => {
+    if (!requestConfirmation('¿Querés cancelar definitivamente este turno fijo?')) return;
+    await setDoc(
+      doc(db, 'fixedBookings', fixedId),
+      { status: 'cancelled', cancelledBy: canAccessAdmin ? 'admin' : 'user', updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    setStatusMessage('Turno fijo cancelado.');
+    await loadFixedBookings(user?.uid, canAccessAdmin);
   };
 
   const cancelBookingFromAdmin = async (bookingId) => {
@@ -862,8 +755,12 @@ function App() {
           <MyBookingsPage
             user={user}
             bookings={myBookings}
+            fixedBookings={fixedBookings.filter((entry) => entry.userId === user?.uid)}
             courts={courts}
             onCancelBooking={cancelBooking}
+            onCreateFixedBooking={createFixedBookingFromBooking}
+            onUpdateFixedStatus={updateFixedBookingStatus}
+            onCancelFixedBooking={cancelFixedBooking}
             onGoLogin={() => goToAuth('login')}
           />
         )}
@@ -938,6 +835,9 @@ function App() {
             manualBookableDates={adminBookableDates}
             manualBookableCourts={manualBookingAvailability.courts}
             manualBookableHours={manualBookingAvailability.hoursByCourt[manualBookingData.courtId] || []}
+            fixedBookings={fixedBookings}
+            onUpdateFixedStatus={updateFixedBookingStatus}
+            onCancelFixedBooking={cancelFixedBooking}
           />
         )}
       </main>
