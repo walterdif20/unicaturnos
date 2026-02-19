@@ -61,6 +61,7 @@ p {
   border-radius: 999px;
   object-fit: cover;
   border: 2px solid #1d4ed8;
+  margin: auto;
 }
 
 .main-nav {
@@ -270,6 +271,7 @@ input {
 select {
   background: #0f172a;
   color: #f8fafc;
+  HEIGHT: 36PX;
 }
 
 .inline-form {

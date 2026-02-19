@@ -29,21 +29,13 @@ function AuthPage({
 
   return (
     <section className="card auth-card">
-      <h2>Cuenta</h2>
       {!user && (
         <div className="auth-flow">
           <p className="auth-helper">
-            Entrá rápido con Google o elegí correo y contraseña. Solo te toma 1 minuto.
+            Si no tenes cuenta completa tus datos, solo te toma 1 minuto.
           </p>
 
           <div className="auth-switch">
-            <button
-              type="button"
-              className={authView === 'login' ? 'auth-tab auth-tab-active' : 'auth-tab'}
-              onClick={() => onChangeAuthView('login')}
-            >
-              Iniciar sesión
-            </button>
             <button
               type="button"
               className={authView === 'register' ? 'auth-tab auth-tab-active' : 'auth-tab'}
@@ -51,15 +43,18 @@ function AuthPage({
             >
               Registrarse
             </button>
+            <button
+              type="button"
+              className={authView === 'login' ? 'auth-tab auth-tab-active' : 'auth-tab'}
+              onClick={() => onChangeAuthView('login')}
+            >
+              Iniciar sesión
+            </button>
           </div>
 
-          <button type="button" className="btn-secondary" onClick={onGoogleLogin} disabled={authLoading}>
-            {authLoading ? 'Redirigiendo…' : 'Ingresar con Google'}
-          </button>
 
           {authView === 'login' ? (
             <form onSubmit={onLogin} className="profile-form">
-              <h3>Ingresar con correo y contraseña</h3>
               <input
                 type="email"
                 placeholder="Correo electrónico"
@@ -91,13 +86,9 @@ function AuthPage({
               <button type="button" className="btn-link" onClick={onRecoverPassword} disabled={authLoading}>
                 Olvidé mi contraseña
               </button>
-              <button type="button" className="btn-link" onClick={() => onChangeAuthView('register')}>
-                ¿No tenés cuenta? Registrate
-              </button>
             </form>
           ) : (
             <form onSubmit={onRegister} className="profile-form">
-              <h3>Crear cuenta</h3>
               <input
                 type="text"
                 placeholder="Nombre y apellido"
@@ -108,7 +99,7 @@ function AuthPage({
               />
               <div className="phone-grid">
                 <select value={registerData.countryCode} onChange={(event) => onChangeRegister('countryCode', event.target.value)} required>
-                  <option value="54">54 AR</option>
+                  <option value="54">+54 Argentina</option>
                 </select>
                 <input
                   type="tel"
@@ -127,7 +118,8 @@ function AuthPage({
                   required
                 />
               </div>
-              <small className="field-hint">Ejemplo: +54 2262 12345678</small>
+              <small className="field-hint">Ejemplo: +54 2262 451123</small>
+
               <input
                 type="email"
                 placeholder="Correo electrónico"
@@ -135,7 +127,7 @@ function AuthPage({
                 onChange={(event) => onChangeRegister('email', event.target.value)}
                 autoComplete="email"
                 required
-              />
+                />
               <div className="password-field">
                 <input
                   type={showRegisterPassword ? 'text' : 'password'}
@@ -145,20 +137,18 @@ function AuthPage({
                   autoComplete="new-password"
                   required
                   minLength={6}
-                />
+                  />
                 <button
                   type="button"
                   className="btn-secondary password-toggle"
                   onClick={() => setShowRegisterPassword((prev) => !prev)}
-                >
+                  >
                   {showRegisterPassword ? 'Ocultar' : 'Ver'}
-                </button>
+                </button><br />
+                  <small>Elegí una contraseña, si la olvidas podrás recuperarla con tu correo</small>
               </div>
               <button type="submit" disabled={authLoading}>
                 {authLoading ? 'Creando cuenta…' : 'Registrarme'}
-              </button>
-              <button type="button" className="btn-link" onClick={() => onChangeAuthView('login')}>
-                Ya tengo cuenta, quiero iniciar sesión
               </button>
             </form>
           )}

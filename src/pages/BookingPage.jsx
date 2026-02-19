@@ -88,21 +88,21 @@ function BookingPage({
         <summary>ℹ️ Información importante del turno</summary>
         <div className="booking-info-content">
           <p>
-            <strong>Valor del turno:</strong> ${courtPrice.toLocaleString('es-AR')}.
+            <strong>💰Valor del turno:</strong> ${courtPrice.toLocaleString('es-AR')}.
           </p>
           <p>
-            Se divide entre todos los jugadores: 7 vs 7 = ${perPlayer7v7.toLocaleString('es-AR')} por persona, 6 vs 6 = ${perPlayer6v6.toLocaleString('es-AR')} por persona y así sucesivamente.
+            🟢Se divide entre todos los jugadores: 7 vs 7 = ${perPlayer7v7.toLocaleString('es-AR')} por persona, 6 vs 6 = ${perPlayer6v6.toLocaleString('es-AR')} por persona y así sucesivamente.
           </p>
           <p>
-            Reservas únicamente por WhatsApp. El mismo día del turno (10:00 a 12:00 hs) enviamos mensaje de
+            📩El mismo día del turno (10:00 a 12:00 hs) enviamos mensaje de
             confirmación.
           </p>
           <p>
-            El turno queda a nombre de una persona responsable que confirma, abona el total y entrega las pecheras al
+            👤El turno queda a nombre de una persona responsable que confirma, abona el total y entrega las pecheras al
             finalizar.
           </p>
           <p>
-            <strong>Pagos:</strong> efectivo (todos le pagan a una sola persona) o transferencia (todos a una misma cuenta,
+            <strong>⚠️Pagos:</strong> efectivo (todos le pagan a una sola persona) o transferencia (todos a una misma cuenta,
             que es la única que transfiere a La Única Quequén). No se reciben pagos individuales.
           </p>
         </div>
