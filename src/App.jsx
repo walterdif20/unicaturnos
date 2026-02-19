@@ -72,6 +72,26 @@ const parsePhone = (phone = '') => {
 const isProfileComplete = (profile) => Boolean(profile?.firstName && profile?.lastName && profile?.phone);
 
 const buildConfirmationToken = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const getFirebaseAuthErrorMessage = (error, fallbackMessage) => {
+  const errorCode = error?.code || '';
+  const errorMessage = error?.message || '';
+
+  if (errorCode === 'auth/configuration-not-found' || errorMessage.includes('CONFIGURATION_NOT_FOUND')) {
+    return 'No se pudo conectar con Firebase Auth (CONFIGURATION_NOT_FOUND). Verificá que el API key pertenezca al proyecto activo y que Authentication esté habilitado en Firebase Console.';
+  }
+
+  if (errorCode === 'auth/invalid-api-key') {
+    return 'El API key de Firebase es inválido. Revisá VITE_FIREBASE_API_KEY en tu .env.';
+  }
+
+  if (errorCode === 'auth/network-request-failed') {
+    return 'No se pudo conectar con Firebase. Revisá tu conexión e intentá nuevamente.';
+  }
+
+  return fallbackMessage;
+};
+
 const emptyManualBooking = {
   date: '',
   courtId: '',
@@ -253,8 +273,8 @@ function App() {
     setAuthLoading(true);
     try {
       await signInWithRedirect(auth, googleProvider);
-    } catch {
-      setAuthError('No se pudo iniciar sesión con Google.');
+    } catch (error) {
+      setAuthError(getFirebaseAuthErrorMessage(error, 'No se pudo iniciar sesión con Google.'));
       setAuthLoading(false);
     }
   };
@@ -269,8 +289,8 @@ function App() {
       setLoginData(emptyLogin);
       setStatusMessage('Sesión iniciada.');
       setActiveSection('reservas');
-    } catch {
-      setAuthError('No se pudo iniciar sesión. Verificá tus credenciales.');
+    } catch (error) {
+      setAuthError(getFirebaseAuthErrorMessage(error, 'No se pudo iniciar sesión. Verificá tus credenciales.'));
     } finally {
       setAuthLoading(false);
     }
@@ -309,8 +329,8 @@ function App() {
       setStatusMessage('Cuenta creada correctamente.');
       setEditingProfile(false);
       setActiveSection('reservas');
-    } catch {
-      setAuthError('No se pudo registrar la cuenta.');
+    } catch (error) {
+      setAuthError(getFirebaseAuthErrorMessage(error, 'No se pudo registrar la cuenta.'));
     } finally {
       setAuthLoading(false);
     }
@@ -330,8 +350,10 @@ function App() {
     try {
       await sendPasswordResetEmail(auth, email);
       setStatusMessage('Te enviamos un enlace para recuperar tu contraseña. Revisá tu correo.');
-    } catch {
-      setAuthError('No se pudo enviar el correo de recuperación. Verificá el email e intentá de nuevo.');
+    } catch (error) {
+      setAuthError(
+        getFirebaseAuthErrorMessage(error, 'No se pudo enviar el correo de recuperación. Verificá el email e intentá de nuevo.')
+      );
     } finally {
       setAuthLoading(false);
     }
