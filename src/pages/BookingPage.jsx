@@ -59,8 +59,8 @@ function BookingPage({
   const canGoNext = selectedDateIndex < upcomingDates.length - 1;
   const isHoliday = holidays.includes(selectedDate);
   const dayIndex = new Date(`${selectedDate}T00:00:00`).getDay();
-  const perPlayer7v7 = Math.ceil(courtPrice / 14);
-  const perPlayer6v6 = Math.ceil(courtPrice / 12);
+  const perPlayer7v7 = Math.round(courtPrice / 14);
+  const perPlayer6v6 = Math.round(courtPrice / 12);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

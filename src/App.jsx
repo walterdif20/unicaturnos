@@ -105,7 +105,7 @@ const DEFAULT_COURT_PRICE = 58800;
 
 const parseCourtPrice = (value) => {
   const normalizedValue = Number(value);
-  if (!Number.isFinite(normalizedValue) || normalizedValue <= 0) return DEFAULT_COURT_PRICE;
+  if (!Number.isFinite(normalizedValue) || normalizedValue < 0) return DEFAULT_COURT_PRICE;
   return Math.round(normalizedValue);
 };
 

@@ -152,8 +152,7 @@ function AdminPage({
             <form onSubmit={onSaveCourtPrice} className="inline-form">
               <input
                 type="number"
-                min="1"
-                step="100"
+                step="any"
                 value={newCourtPrice}
                 onChange={(event) => onChangeCourtPrice(event.target.value)}
                 placeholder="Valor total de la cancha"
