@@ -37,7 +37,13 @@ function AdminPage({
   manualBookableHours,
   fixedBookings,
   onUpdateFixedStatus,
-  onCancelFixedBooking
+  onCancelFixedBooking,
+  raffleDraft,
+  raffleAnimating,
+  raffleWinners,
+  onChangeRaffleItemName,
+  onSpinRaffle,
+  onPublishRaffleWinner
 }) {
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const [activeAdminPanel, setActiveAdminPanel] = useState('canchas');
@@ -101,6 +107,13 @@ function AdminPage({
           onClick={() => setActiveAdminPanel('roles')}
         >
           Gestión de roles
+        </button>
+        <button
+          type="button"
+          className={activeAdminPanel === 'sorteos' ? 'nav-pill nav-pill-active' : 'nav-pill'}
+          onClick={() => setActiveAdminPanel('sorteos')}
+        >
+          Sorteos
         </button>
       </div>
 
@@ -457,6 +470,7 @@ function AdminPage({
           </article>
         )}
 
+
         {activeAdminPanel === 'roles' && (
           <article className="admin-panel">
             <h3>Gestión de roles</h3>
@@ -524,6 +538,69 @@ function AdminPage({
                 </ul>
               )}
             </div>
+          </article>
+        )}
+
+        {activeAdminPanel === 'sorteos' && (
+          <article className="admin-panel raffle-panel">
+            <h3>Ruleta de sorteos</h3>
+            <p className="admin-panel-subtitle">Elegí el artículo, girá la ruleta y publicá el resultado oficial.</p>
+
+            <label>
+              Artículo a sortear
+              <input
+                type="text"
+                placeholder="Ej: Camiseta oficial"
+                value={raffleDraft.itemName}
+                onChange={(event) => onChangeRaffleItemName(event.target.value)}
+              />
+            </label>
+
+            <div className={raffleAnimating ? 'raffle-wheel raffle-wheel-spinning' : 'raffle-wheel'}>
+              <p className="raffle-wheel-title">El ganador de {raffleDraft.itemName || '...'} es:</p>
+              <p className="raffle-wheel-name">{raffleDraft.winnerName || '🎁 Girá la ruleta 🎁'}</p>
+            </div>
+
+            <div className="raffle-actions">
+              <button type="button" onClick={onSpinRaffle} disabled={raffleAnimating}>
+                {raffleAnimating ? 'Girando...' : 'Girar ruleta'}
+              </button>
+              <button type="button" className="btn-secondary" onClick={onPublishRaffleWinner} disabled={raffleAnimating || !raffleDraft.winnerId}>
+                Hacer oficial el sorteo
+              </button>
+              {raffleDraft.winnerPhone ? (
+                <a className="btn-whatsapp" href={`https://wa.me/${raffleDraft.winnerPhone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
+                  Contactar ganador por WhatsApp
+                </a>
+              ) : null}
+            </div>
+
+            <section>
+              <h4>Ganadores de los últimos sorteos</h4>
+              {raffleWinners.length === 0 ? (
+                <p>Todavía no hay resultados publicados.</p>
+              ) : (
+                <ul className="raffle-history-list">
+                  {raffleWinners.map((raffle) => (
+                    <li key={raffle.id} className="raffle-history-item">
+                      <span>
+                        {raffle.drawDate} · {raffle.itemName} · <strong>{raffle.winnerName}</strong>
+                      </span>
+                      {raffle.winnerPhone ? (
+                        <a
+                          className="btn-whatsapp"
+                          href={`https://wa.me/${raffle.winnerPhone.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          WhatsApp
+                        </a>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </article>
         )}
       </div>

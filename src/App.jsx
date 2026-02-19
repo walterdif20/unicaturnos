@@ -30,6 +30,7 @@ import BookingPage from './pages/BookingPage';
 import AuthPage from './pages/AuthPage';
 import AdminPage from './pages/AdminPage';
 import MyBookingsPage from './pages/MyBookingsPage';
+import RaffleWinnersPage from './pages/RaffleWinnersPage';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -116,6 +117,19 @@ const DEFAULT_COURT_PRICE = 58800;
 const FIXED_BOOKING_WEEKS_AHEAD = 4;
 const ALLOWED_FIXED_BOOKING_STATUSES = ['active', 'paused', 'cancelled'];
 
+const emptyRaffleDraft = {
+  itemName: '',
+  winnerId: '',
+  winnerName: '',
+  winnerPhone: ''
+};
+
+const formatRaffleDrawDate = (date = new Date()) =>
+  new Intl.DateTimeFormat('es-AR', {
+    dateStyle: 'full',
+    timeStyle: 'short'
+  }).format(date);
+
 const parseCourtPrice = (value) => {
   const normalizedValue = Number(value);
   if (!Number.isFinite(normalizedValue) || normalizedValue < 0) return DEFAULT_COURT_PRICE;
@@ -158,6 +172,9 @@ function App() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [courtPrice, setCourtPrice] = useState(DEFAULT_COURT_PRICE);
   const [newCourtPrice, setNewCourtPrice] = useState(String(DEFAULT_COURT_PRICE));
+  const [raffleDraft, setRaffleDraft] = useState(emptyRaffleDraft);
+  const [raffleWinners, setRaffleWinners] = useState([]);
+  const [raffleAnimating, setRaffleAnimating] = useState(false);
   const canAccessAdmin = Boolean(profile?.isAdmin);
 
   const requestConfirmation = (message) => {
@@ -323,6 +340,17 @@ function App() {
       .sort((a, b) => a.email.localeCompare(b.email));
     setAllUsers(usersData);
     setAdminUsers(usersData.filter((entry) => entry.isAdmin));
+
+    const rafflesSnapshot = await getDocs(collection(db, 'raffleHistory'));
+    const rafflesData = rafflesSnapshot.docs
+      .map((raffleDoc) => ({ id: raffleDoc.id, ...raffleDoc.data() }))
+      .sort((a, b) => {
+        const aTime = a.createdAt?.seconds || 0;
+        const bTime = b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      })
+      .slice(0, 12);
+    setRaffleWinners(rafflesData);
 
     if (user?.uid) {
       await loadFixedBookings(user.uid, Boolean(usersData.find((entry) => entry.id === user.uid)?.isAdmin));
@@ -819,6 +847,88 @@ function App() {
     setStatusMessage('Valor de la cancha actualizado correctamente.');
   };
 
+  const spinRaffle = async () => {
+    if (!canAccessAdmin || raffleAnimating) return;
+
+    const eligibleUsers = allUsers.filter((entry) => entry.firstName && entry.phone);
+    const itemName = raffleDraft.itemName.trim();
+
+    if (!itemName) {
+      setStatusMessage('Ingresá el nombre del artículo antes de girar la ruleta.');
+      return;
+    }
+
+    if (eligibleUsers.length === 0) {
+      setStatusMessage('No hay usuarios registrados con nombre y teléfono para sortear.');
+      return;
+    }
+
+    setRaffleAnimating(true);
+
+    const animationDuration = 4200;
+    const intervalMs = 95;
+    let tick = 0;
+    const totalTicks = Math.floor(animationDuration / intervalMs);
+
+    const intervalId = setInterval(() => {
+      const candidate = eligibleUsers[Math.floor(Math.random() * eligibleUsers.length)];
+      setRaffleDraft((prev) => ({
+        ...prev,
+        winnerId: candidate.id,
+        winnerName: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() || candidate.email || 'Participante',
+        winnerPhone: candidate.phone || ''
+      }));
+
+      tick += 1;
+      if (tick >= totalTicks) {
+        clearInterval(intervalId);
+        setRaffleAnimating(false);
+      }
+    }, intervalMs);
+  };
+
+  const publishRaffleWinner = async () => {
+    if (!canAccessAdmin) return;
+
+    const itemName = raffleDraft.itemName.trim();
+    if (!itemName) {
+      setStatusMessage('Ingresá el artículo del sorteo antes de hacerlo oficial.');
+      return;
+    }
+
+    if (!raffleDraft.winnerId) {
+      setStatusMessage('Primero girá la ruleta para elegir un ganador.');
+      return;
+    }
+
+    if (!requestConfirmation('¿Querés publicar este resultado como oficial?')) return;
+
+    const drawDate = formatRaffleDrawDate(new Date());
+
+    await addDoc(collection(db, 'raffleHistory'), {
+      itemName,
+      winnerId: raffleDraft.winnerId,
+      winnerName: raffleDraft.winnerName,
+      drawDate,
+      createdAt: serverTimestamp(),
+      publishedBy: user?.uid || null
+    });
+
+    await addDoc(collection(db, 'raffleContacts'), {
+      itemName,
+      winnerId: raffleDraft.winnerId,
+      winnerName: raffleDraft.winnerName,
+      winnerPhone: raffleDraft.winnerPhone,
+      drawDate,
+      createdAt: serverTimestamp(),
+      publishedBy: user?.uid || null
+    });
+
+    setRaffleDraft(emptyRaffleDraft);
+    setStatusMessage('Sorteo oficial publicado correctamente.');
+    await loadCoreData(selectedDate);
+  };
+
   const dayIndex = new Date(`${selectedDate}T00:00:00`).getDay();
 
   const slotsByCourt = useMemo(
@@ -1026,6 +1136,8 @@ function App() {
           />
         )}
 
+        {!loading && activeSection === 'ganadores' && <RaffleWinnersPage raffleWinners={raffleWinners} />}
+
         {!loading && activeSection === 'mis-reservas' && (
           <MyBookingsPage
             user={user}
@@ -1113,6 +1225,17 @@ function App() {
             fixedBookings={fixedBookings}
             onUpdateFixedStatus={updateFixedBookingStatus}
             onCancelFixedBooking={cancelFixedBooking}
+            raffleDraft={raffleDraft}
+            raffleAnimating={raffleAnimating}
+            raffleWinners={raffleWinners}
+            onChangeRaffleItemName={(value) =>
+              setRaffleDraft((prev) => ({
+                ...prev,
+                itemName: value
+              }))
+            }
+            onSpinRaffle={spinRaffle}
+            onPublishRaffleWinner={publishRaffleWinner}
           />
         )}
       </main>

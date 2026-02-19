@@ -1,5 +1,6 @@
 const sections = [
   { id: 'reservas', label: 'Reservas' },
+  { id: 'ganadores', label: 'Últimos ganadores' },
   { id: 'mis-reservas', label: 'Mis reservas' },
   { id: 'registro', label: 'Mi cuenta' },
   { id: 'admin', label: 'Administración', requiresAdmin: true }
