@@ -130,6 +130,30 @@ const formatRaffleDrawDate = (date = new Date()) =>
     timeStyle: 'short'
   }).format(date);
 
+
+const SECTION_HELP = {
+  reservas: {
+    title: 'Reservas',
+    description: 'Elegí fecha y horario para reservar tu cancha en pocos pasos.'
+  },
+  ganadores: {
+    title: 'Últimos ganadores',
+    description: 'Consultá los resultados de los sorteos más recientes.'
+  },
+  'mis-reservas': {
+    title: 'Mis reservas',
+    description: 'Revisá, confirmá o cancelá tus turnos activos.'
+  },
+  registro: {
+    title: 'Mi cuenta',
+    description: 'Iniciá sesión, registrate o editá tus datos de perfil.'
+  },
+  admin: {
+    title: 'Administración',
+    description: 'Configurá canchas, horarios, feriados y usuarios.'
+  }
+};
+
 const parseCourtPrice = (value) => {
   const normalizedValue = Number(value);
   if (!Number.isFinite(normalizedValue) || normalizedValue < 0) return DEFAULT_COURT_PRICE;
@@ -1086,6 +1110,14 @@ function App() {
   };
 
   const parsedProfilePhone = parsePhone(profile?.phone || '');
+  const activeSectionDetails = SECTION_HELP[activeSection];
+
+  const handleChangeSection = (nextSection) => {
+    setActiveSection(nextSection);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   const profileDraft = {
     fullName: registerData.fullName || `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim(),
@@ -1096,8 +1128,43 @@ function App() {
 
   return (
     <div className="app">
+      <section className="auth-topbar" aria-label="Accesos de cuenta">
+        <div className="auth-topbar-status">
+          {user ? (
+            <p>
+              Sesión iniciada como{' '}
+              <strong>{`${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || user.email}</strong>
+            </p>
+          ) : (
+            <p>No iniciaste sesión.</p>
+          )}
+        </div>
+        <div className="auth-topbar-actions">
+          {!user ? (
+            <>
+              <button type="button" className="btn-secondary" onClick={() => goToAuth('login')}>
+                Login
+              </button>
+              <button type="button" onClick={() => goToAuth('register')}>
+                Registrarme
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn-secondary" onClick={logoutUser}>
+              Cerrar sesión
+            </button>
+          )}
+        </div>
+      </section>
       <Header />
-      <MainNav activeSection={activeSection} onChangeSection={setActiveSection} canAccessAdmin={canAccessAdmin} />
+      <MainNav activeSection={activeSection} onChangeSection={handleChangeSection} canAccessAdmin={canAccessAdmin} />
+
+      {activeSectionDetails ? (
+        <section className="section-guide" aria-live="polite">
+          <p className="section-guide-title">{activeSectionDetails.title}</p>
+          <p>{activeSectionDetails.description}</p>
+        </section>
+      ) : null}
 
       <main>
         {loading ? (
