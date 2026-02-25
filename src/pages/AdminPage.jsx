@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { DEFAULT_DAYS, DEFAULT_SCHEDULE } from '../constants';
+import { toLocalDate } from '../utils/date';
 import FootballRaffleScene from '../components/FootballRaffleScene';
 
 function AdminPage({
@@ -36,6 +37,8 @@ function AdminPage({
   manualBookableDates,
   manualBookableCourts,
   manualBookableHours,
+  onPrefillManualBooking,
+  onMoveBooking,
   fixedBookings,
   onUpdateFixedStatus,
   onCancelFixedBooking,
@@ -47,8 +50,16 @@ function AdminPage({
   onPublishRaffleWinner
 }) {
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const today = toLocalDate(new Date());
   const [activeAdminPanel, setActiveAdminPanel] = useState('canchas');
-  const [selectedDayFilter, setSelectedDayFilter] = useState('all');
+  const [dateFilterType, setDateFilterType] = useState('today');
+  const [exactDateFilter, setExactDateFilter] = useState(today);
+  const [rangeStartFilter, setRangeStartFilter] = useState(today);
+  const [rangeEndFilter, setRangeEndFilter] = useState(today);
+  const [selectedCourtFilter, setSelectedCourtFilter] = useState('all');
+  const [showFreeSlots, setShowFreeSlots] = useState(false);
+  const [movingBookingId, setMovingBookingId] = useState('');
+  const [moveDraft, setMoveDraft] = useState({ date: '', courtId: '', hour: '' });
   const [fixedDayFilter, setFixedDayFilter] = useState('all');
 
 
@@ -58,15 +69,93 @@ function AdminPage({
     return fixedBookings.filter((booking) => Number(booking.weekday) === Number(fixedDayFilter));
   }, [fixedBookings, fixedDayFilter]);
 
-  const filteredAdminBookings = useMemo(() => {
-    if (selectedDayFilter === 'all') return adminBookings;
+  const visibleDates = useMemo(() => {
+    if (dateFilterType === 'today') return [today];
+    if (dateFilterType === 'exact' && exactDateFilter) return [exactDateFilter];
+    if (dateFilterType === 'range') {
+      const start = rangeStartFilter || rangeEndFilter;
+      const end = rangeEndFilter || rangeStartFilter;
+      if (!start || !end) return [];
+      const normalizedStart = start <= end ? start : end;
+      const normalizedEnd = start <= end ? end : start;
+      const dates = [];
+      const cursor = new Date(`${normalizedStart}T00:00:00`);
+      const last = new Date(`${normalizedEnd}T00:00:00`);
 
-    return adminBookings.filter((booking) => {
-      if (!booking.date) return false;
-      const bookingDay = new Date(`${booking.date}T00:00:00`).getDay();
-      return bookingDay === Number(selectedDayFilter);
+      while (cursor <= last && dates.length < 45) {
+        dates.push(toLocalDate(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return dates;
+    }
+
+    return [];
+  }, [dateFilterType, exactDateFilter, rangeStartFilter, rangeEndFilter, today]);
+
+  const bookingsBySlot = useMemo(() => {
+    const mapped = new Map();
+    adminBookings.forEach((booking) => {
+      mapped.set(`${booking.date}-${booking.courtId}-${booking.hour}`, booking);
     });
-  }, [adminBookings, selectedDayFilter]);
+    return mapped;
+  }, [adminBookings]);
+
+  const groupedAdminBookings = useMemo(() => {
+    const groups = [];
+
+    visibleDates.forEach((date) => {
+      const dayIndex = new Date(`${date}T00:00:00`).getDay();
+      const courtsForDate = selectedCourtFilter === 'all' ? courts : courts.filter((court) => court.id === selectedCourtFilter);
+
+      courtsForDate.forEach((court) => {
+        const daySchedule = (schedules[court.id] || DEFAULT_SCHEDULE)[dayIndex];
+        const hours = daySchedule && daySchedule.open < daySchedule.close
+          ? Array.from({ length: daySchedule.close - daySchedule.open }, (_, idx) => daySchedule.open + idx)
+          : [];
+
+        const rows = hours.reduce((acc, hour) => {
+          const booking = bookingsBySlot.get(`${date}-${court.id}-${hour}`);
+          if (booking) {
+            acc.push({ type: 'reserved', booking, hour });
+            return acc;
+          }
+          if (showFreeSlots) {
+            acc.push({ type: 'free', date, courtId: court.id, courtName: court.name, hour });
+          }
+          return acc;
+        }, []);
+
+        if (rows.length > 0) {
+          groups.push({
+            key: `${date}-${court.id}`,
+            date,
+            dayName: DEFAULT_DAYS[dayIndex],
+            court,
+            rows
+          });
+        }
+      });
+    });
+
+    return groups;
+  }, [visibleDates, selectedCourtFilter, courts, schedules, bookingsBySlot, showFreeSlots]);
+
+  const moveDates = useMemo(() => {
+    const allDates = [...new Set([...visibleDates, ...manualBookableDates])].sort();
+    return allDates.length > 0 ? allDates : [today];
+  }, [visibleDates, manualBookableDates, today]);
+
+  const moveHours = useMemo(() => {
+    if (!moveDraft.date || !moveDraft.courtId) return [];
+    const dayIndex = new Date(`${moveDraft.date}T00:00:00`).getDay();
+    const daySchedule = (schedules[moveDraft.courtId] || DEFAULT_SCHEDULE)[dayIndex];
+    if (!daySchedule || daySchedule.open >= daySchedule.close) return [];
+
+    return Array.from({ length: daySchedule.close - daySchedule.open }, (_, idx) => daySchedule.open + idx).filter((hour) => {
+      const found = bookingsBySlot.get(`${moveDraft.date}-${moveDraft.courtId}-${hour}`);
+      return !found || found.id === movingBookingId;
+    });
+  }, [moveDraft.date, moveDraft.courtId, schedules, bookingsBySlot, movingBookingId]);
 
   const buildConfirmationLink = (booking) => {
     if (!appOrigin || !booking?.id) return '';
@@ -101,6 +190,13 @@ function AdminPage({
           onClick={() => setActiveAdminPanel('turnos')}
         >
           Turnos
+        </button>
+        <button
+          type="button"
+          className={activeAdminPanel === 'turnos-fijos' ? 'nav-pill nav-pill-active' : 'nav-pill'}
+          onClick={() => setActiveAdminPanel('turnos-fijos')}
+        >
+          Turnos fijos
         </button>
         <button
           type="button"
@@ -207,7 +303,7 @@ function AdminPage({
         {activeAdminPanel === 'turnos' && (
           <article className="admin-panel">
             <h3>Turnos reservados</h3>
-            <p className="admin-panel-subtitle">Tabla con reservas, cancha y datos del cliente.</p>
+            <p className="admin-panel-subtitle">Visualización agrupada por día/cancha, filtros avanzados y acciones rápidas.</p>
 
             <section className="manual-booking-card">
               <h4>Cargar turno manual</h4>
@@ -303,163 +399,275 @@ function AdminPage({
               </form>
             </section>
 
-
-
             <section className="manual-booking-card">
-              <h4>Turnos fijos</h4>
-              <div className="day-filter-buttons" role="group" aria-label="Filtrar turnos fijos por día de la semana">
-                <button
-                  type="button"
-                  className={fixedDayFilter === 'all' ? 'nav-pill nav-pill-active' : 'nav-pill'}
-                  onClick={() => setFixedDayFilter('all')}
-                >
-                  Todos
+              <h4>Filtros de turnos</h4>
+              <div className="day-filter-buttons" role="group" aria-label="Filtro por período">
+                <button type="button" className={dateFilterType === 'today' ? 'nav-pill nav-pill-active' : 'nav-pill'} onClick={() => setDateFilterType('today')}>
+                  Hoy
                 </button>
-                {DEFAULT_DAYS.map((day, dayIndex) => (
-                  <button
-                    key={`fixed-${day}`}
-                    type="button"
-                    className={fixedDayFilter === String(dayIndex) ? 'nav-pill nav-pill-active' : 'nav-pill'}
-                    onClick={() => setFixedDayFilter(String(dayIndex))}
-                  >
-                    {day}
-                  </button>
-                ))}
+                <button type="button" className={dateFilterType === 'exact' ? 'nav-pill nav-pill-active' : 'nav-pill'} onClick={() => setDateFilterType('exact')}>
+                  Fecha exacta
+                </button>
+                <button type="button" className={dateFilterType === 'range' ? 'nav-pill nav-pill-active' : 'nav-pill'} onClick={() => setDateFilterType('range')}>
+                  Rango de fechas
+                </button>
               </div>
-              <div className="admin-table-wrapper">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Cliente</th>
-                      <th>Cancha</th>
-                      <th>Día</th>
-                      <th>Hora</th>
-                      <th>Estado</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fixedBookingsForAdmin.length === 0 ? (
-                      <tr>
-                        <td colSpan={6}>No hay turnos fijos.</td>
-                      </tr>
-                    ) : (
-                      fixedBookingsForAdmin.map((fixedBooking) => {
-                        const courtName = courts.find((court) => court.id === fixedBooking.courtId)?.name || fixedBooking.courtId;
-                        return (
-                          <tr key={fixedBooking.id}>
-                            <td data-label="Cliente">{fixedBooking.userName || '-'}</td>
-                            <td data-label="Cancha">{courtName}</td>
-                            <td data-label="Día">{DEFAULT_DAYS[fixedBooking.weekday] || '-'}</td>
-                            <td data-label="Hora">{fixedBooking.hour}:00</td>
-                            <td data-label="Estado">{fixedBooking.status}</td>
-                            <td data-label="Acciones">
-                              {fixedBooking.status === 'active' ? (
-                                <button type="button" className="btn-secondary" onClick={() => onUpdateFixedStatus(fixedBooking.id, 'paused')}>
-                                  Pausar
-                                </button>
-                              ) : fixedBooking.status === 'paused' ? (
-                                <button type="button" className="btn-secondary" onClick={() => onUpdateFixedStatus(fixedBooking.id, 'active')}>
-                                  Reactivar
-                                </button>
-                              ) : null}
-                              {fixedBooking.status !== 'cancelled' && (
-                                <button type="button" className="btn-cancel" onClick={() => onCancelFixedBooking(fixedBooking.id)}>
-                                  Cancelar
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+
+              {dateFilterType === 'exact' ? (
+                <label>
+                  Fecha
+                  <input type="date" value={exactDateFilter} onChange={(event) => setExactDateFilter(event.target.value)} />
+                </label>
+              ) : null}
+
+              {dateFilterType === 'range' ? (
+                <div className="admin-filters-grid">
+                  <label>
+                    Desde
+                    <input type="date" value={rangeStartFilter} onChange={(event) => setRangeStartFilter(event.target.value)} />
+                  </label>
+                  <label>
+                    Hasta
+                    <input type="date" value={rangeEndFilter} onChange={(event) => setRangeEndFilter(event.target.value)} />
+                  </label>
+                </div>
+              ) : null}
+
+              <div className="admin-filters-grid">
+                <label>
+                  Cancha
+                  <select value={selectedCourtFilter} onChange={(event) => setSelectedCourtFilter(event.target.value)}>
+                    <option value="all">Todas</option>
+                    {courts.map((court) => (
+                      <option key={`filter-${court.id}`} value={court.id}>
+                        {court.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={showFreeSlots} onChange={(event) => setShowFreeSlots(event.target.checked)} />
+                  Mostrar registros libres
+                </label>
               </div>
             </section>
 
-            <div className="day-filter-buttons" role="group" aria-label="Filtrar turnos por día de la semana">
-              <button
-                type="button"
-                className={selectedDayFilter === 'all' ? 'nav-pill nav-pill-active' : 'nav-pill'}
-                onClick={() => setSelectedDayFilter('all')}
-              >
-                Todos
-              </button>
-              {DEFAULT_DAYS.map((day, dayIndex) => (
-                <button
-                  key={day}
-                  type="button"
-                  className={selectedDayFilter === String(dayIndex) ? 'nav-pill nav-pill-active' : 'nav-pill'}
-                  onClick={() => setSelectedDayFilter(String(dayIndex))}
-                >
-                  {day}
-                </button>
-              ))}
-            </div>
+            {movingBookingId ? (
+              <section className="manual-booking-card">
+                <h4>Mover turno reservado</h4>
+                <div className="admin-filters-grid">
+                  <label>
+                    Fecha nueva
+                    <select value={moveDraft.date} onChange={(event) => setMoveDraft((prev) => ({ ...prev, date: event.target.value, hour: '' }))}>
+                      {moveDates.map((date) => (
+                        <option key={`move-date-${date}`} value={date}>{date}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Cancha nueva
+                    <select value={moveDraft.courtId} onChange={(event) => setMoveDraft((prev) => ({ ...prev, courtId: event.target.value, hour: '' }))}>
+                      {courts.map((court) => (
+                        <option key={`move-court-${court.id}`} value={court.id}>{court.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Hora nueva
+                    <select value={moveDraft.hour} onChange={(event) => setMoveDraft((prev) => ({ ...prev, hour: event.target.value }))}>
+                      {moveHours.length === 0 ? <option value="">Sin horarios libres</option> : null}
+                      {moveHours.map((hour) => (
+                        <option key={`move-hour-${hour}`} value={hour}>{hour}:00</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="role-actions">
+                  <button
+                    type="button"
+                    disabled={!moveDraft.date || !moveDraft.courtId || moveDraft.hour === ''}
+                    onClick={() => {
+                      onMoveBooking(movingBookingId, {
+                        date: moveDraft.date,
+                        courtId: moveDraft.courtId,
+                        hour: Number(moveDraft.hour)
+                      });
+                      setMovingBookingId('');
+                    }}
+                  >
+                    Guardar cambios
+                  </button>
+                  <button type="button" className="btn-secondary" onClick={() => setMovingBookingId('')}>
+                    Cancelar edición
+                  </button>
+                </div>
+              </section>
+            ) : null}
 
             <div className="admin-table-wrapper">
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Fecha</th>
-                    <th>Hora</th>
+                    <th>Día / Fecha</th>
                     <th>Cancha</th>
-                    <th>Nombre y apellido</th>
+                    <th>Hora</th>
+                    <th>Cliente</th>
                     <th>Estado</th>
                     <th>WhatsApp</th>
                     <th>Confirmación</th>
-                    <th>Cancelar</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAdminBookings.length === 0 ? (
+                  {groupedAdminBookings.length === 0 ? (
                     <tr>
-                      <td colSpan={8}>No hay turnos reservados.</td>
+                      <td colSpan={8}>No hay registros para los filtros seleccionados.</td>
                     </tr>
                   ) : (
-                    filteredAdminBookings.map((booking) => {
-                      const courtName = courts.find((court) => court.id === booking.courtId)?.name || booking.courtId;
-                      const confirmUrl = buildWhatsappConfirmUrl(booking, courtName);
+                    groupedAdminBookings.flatMap((group) =>
+                      group.rows.map((row, rowIndex) => {
+                        if (row.type === 'free') {
+                          return (
+                            <tr key={`${group.key}-free-${row.hour}`} className="free-slot-row">
+                              <td data-label="Día / Fecha">{group.dayName} · {group.date}</td>
+                              <td data-label="Cancha">{group.court.name}</td>
+                              <td data-label="Hora">{row.hour}:00</td>
+                              <td data-label="Cliente">-</td>
+                              <td data-label="Estado">Libre</td>
+                              <td data-label="WhatsApp">-</td>
+                              <td data-label="Confirmación">-</td>
+                              <td data-label="Acciones">
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => onPrefillManualBooking({ date: row.date, courtId: row.courtId, hour: row.hour })}
+                                >
+                                  Reservar
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        }
 
+                        const booking = row.booking;
+                        const confirmUrl = buildWhatsappConfirmUrl(booking, group.court.name);
+                        return (
+                          <tr key={booking.id}>
+                            <td data-label="Día / Fecha">{rowIndex === 0 ? `${group.dayName} · ${group.date}` : ''}</td>
+                            <td data-label="Cancha">{group.court.name}</td>
+                            <td data-label="Hora">{booking.hour}:00</td>
+                            <td data-label="Cliente">{booking.userName || '-'}</td>
+                            <td data-label="Estado">{booking.status || 'reservado'}</td>
+                            <td data-label="WhatsApp">
+                              {booking.userPhone ? (
+                                <a className="btn-whatsapp" href={`https://wa.me/${booking.userPhone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
+                                  WhatsApp
+                                </a>
+                              ) : '-'}
+                            </td>
+                            <td data-label="Confirmación">
+                              {booking.status === 'confirmado' ? (
+                                <span className="confirm-check">✓ Confirmado</span>
+                              ) : confirmUrl ? (
+                                <a className="btn-secondary btn-confirm" href={confirmUrl} target="_blank" rel="noreferrer">
+                                  Solicitar confirmación
+                                </a>
+                              ) : '-'}
+                            </td>
+                            <td data-label="Acciones">
+                              <div className="admin-actions-cell">
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => {
+                                    setMovingBookingId(booking.id);
+                                    setMoveDraft({ date: booking.date || moveDates[0] || today, courtId: booking.courtId || courts[0]?.id || '', hour: String(booking.hour ?? '') });
+                                  }}
+                                >
+                                  Modificar / mover
+                                </button>
+                                <button type="button" className="btn-cancel" onClick={() => onCancelBooking(booking.id)}>
+                                  Cancelar
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        )}
+
+        {activeAdminPanel === 'turnos-fijos' && (
+          <article className="admin-panel">
+            <h3>Administración de turnos fijos</h3>
+            <p className="admin-panel-subtitle">Sección dedicada para pausar, reactivar o cancelar turnos semanales.</p>
+            <div className="day-filter-buttons" role="group" aria-label="Filtrar turnos fijos por día de la semana">
+              <button
+                type="button"
+                className={fixedDayFilter === 'all' ? 'nav-pill nav-pill-active' : 'nav-pill'}
+                onClick={() => setFixedDayFilter('all')}
+              >
+                Todos
+              </button>
+              {DEFAULT_DAYS.map((day, dayIndex) => (
+                <button
+                  key={`fixed-${day}`}
+                  type="button"
+                  className={fixedDayFilter === String(dayIndex) ? 'nav-pill nav-pill-active' : 'nav-pill'}
+                  onClick={() => setFixedDayFilter(String(dayIndex))}
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
+            <div className="admin-table-wrapper">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Cancha</th>
+                    <th>Día</th>
+                    <th>Hora</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fixedBookingsForAdmin.length === 0 ? (
+                    <tr>
+                      <td colSpan={6}>No hay turnos fijos.</td>
+                    </tr>
+                  ) : (
+                    fixedBookingsForAdmin.map((fixedBooking) => {
+                      const courtName = courts.find((court) => court.id === fixedBooking.courtId)?.name || fixedBooking.courtId;
                       return (
-                        <tr key={booking.id}>
-                          <td data-label="Fecha">{booking.date || '-'}</td>
-                          <td data-label="Hora">{booking.hour !== undefined && booking.hour !== null ? `${booking.hour}:00` : '-'}</td>
+                        <tr key={fixedBooking.id}>
+                          <td data-label="Cliente">{fixedBooking.userName || '-'}</td>
                           <td data-label="Cancha">{courtName}</td>
-                          <td data-label="Nombre y apellido">{booking.userName || '-'}</td>
-                          <td data-label="Estado">{booking.status || 'reservado'}</td>
-                          <td data-label="WhatsApp">
-                            {booking.userPhone ? (
-                              <a
-                                className="btn-whatsapp"
-                                href={`https://wa.me/${booking.userPhone.replace(/\D/g, '')}`}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                WhatsApp
-                              </a>
-                            ) : (
-                              '-'
+                          <td data-label="Día">{DEFAULT_DAYS[fixedBooking.weekday] || '-'}</td>
+                          <td data-label="Hora">{fixedBooking.hour}:00</td>
+                          <td data-label="Estado">{fixedBooking.status}</td>
+                          <td data-label="Acciones">
+                            {fixedBooking.status === 'active' ? (
+                              <button type="button" className="btn-secondary" onClick={() => onUpdateFixedStatus(fixedBooking.id, 'paused')}>
+                                Pausar
+                              </button>
+                            ) : fixedBooking.status === 'paused' ? (
+                              <button type="button" className="btn-secondary" onClick={() => onUpdateFixedStatus(fixedBooking.id, 'active')}>
+                                Reactivar
+                              </button>
+                            ) : null}
+                            {fixedBooking.status !== 'cancelled' && (
+                              <button type="button" className="btn-cancel" onClick={() => onCancelFixedBooking(fixedBooking.id)}>
+                                Cancelar
+                              </button>
                             )}
-                          </td>
-                          <td data-label="Confirmación">
-                            {booking.status === 'confirmado' ? (
-                              <span className="confirm-check" aria-label="Turno confirmado" title="Turno confirmado">
-                                ✓ Confirmado
-                              </span>
-                            ) : confirmUrl ? (
-                              <a className="btn-secondary btn-confirm" href={confirmUrl} target="_blank" rel="noreferrer">
-                                Solicitar confirmación
-                              </a>
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                          <td data-label="Cancelar">
-                            <button type="button" className="btn-cancel" onClick={() => onCancelBooking(booking.id)}>
-                              Cancelar turno
-                            </button>
                           </td>
                         </tr>
                       );
@@ -470,7 +678,6 @@ function AdminPage({
             </div>
           </article>
         )}
-
 
         {activeAdminPanel === 'roles' && (
           <article className="admin-panel">

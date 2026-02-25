@@ -758,6 +758,69 @@ function App() {
     await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
   };
 
+  const prefillManualBooking = ({ date, courtId, hour }) => {
+    setActiveSection('admin');
+    setManualBookingData((prev) => ({
+      ...prev,
+      date: date || prev.date,
+      courtId: courtId || prev.courtId,
+      hour: hour !== undefined && hour !== null ? String(hour) : prev.hour
+    }));
+    setStatusMessage('Se precargó el turno libre en la planilla manual.');
+  };
+
+  const moveBookingFromAdmin = async (bookingId, nextSlot) => {
+    if (!bookingId || !nextSlot?.date || !nextSlot?.courtId || nextSlot?.hour === undefined || nextSlot?.hour === null) {
+      setStatusMessage('Completá fecha, cancha y horario para mover el turno.');
+      return;
+    }
+
+    if (!requestConfirmation('¿Querés mover este turno a la nueva fecha/horario?')) return;
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const currentBookingRef = doc(db, 'bookings', bookingId);
+        const currentBookingDoc = await transaction.get(currentBookingRef);
+        if (!currentBookingDoc.exists()) {
+          throw new Error('BOOKING_NOT_FOUND');
+        }
+
+        const bookingData = currentBookingDoc.data();
+        const targetBookingId = `${nextSlot.date}_${nextSlot.courtId}_${Number(nextSlot.hour)}`;
+        const targetBookingRef = doc(db, 'bookings', targetBookingId);
+        const targetBookingDoc = await transaction.get(targetBookingRef);
+
+        if (targetBookingDoc.exists() && targetBookingId !== bookingId) {
+          throw new Error('SLOT_ALREADY_BOOKED');
+        }
+
+        transaction.set(targetBookingRef, {
+          ...bookingData,
+          date: nextSlot.date,
+          courtId: nextSlot.courtId,
+          hour: Number(nextSlot.hour),
+          updatedAt: serverTimestamp()
+        });
+
+        if (targetBookingId !== bookingId) {
+          transaction.delete(currentBookingRef);
+        }
+      });
+
+      setStatusMessage('Turno movido correctamente.');
+      await Promise.all([loadCoreData(selectedDate), loadMyBookings(user?.uid)]);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'SLOT_ALREADY_BOOKED') {
+        setStatusMessage('El nuevo horario ya está ocupado por otro turno.');
+      } else if (error instanceof Error && error.message === 'BOOKING_NOT_FOUND') {
+        setStatusMessage('El turno original ya no existe.');
+      } else {
+        setStatusMessage('No se pudo mover el turno. Intentá nuevamente.');
+      }
+      await loadCoreData(selectedDate);
+    }
+  };
+
   const makeAdministrator = async (uid) => {
     if (!requestConfirmation('¿Estás seguro de que querés otorgar permisos de administrador?')) return;
     await setDoc(doc(db, 'users', uid), { isAdmin: true }, { merge: true });
@@ -1296,6 +1359,8 @@ function App() {
             manualBookableDates={adminBookableDates}
             manualBookableCourts={manualBookingAvailability.courts}
             manualBookableHours={manualBookingAvailability.hoursByCourt[manualBookingData.courtId] || []}
+            onPrefillManualBooking={prefillManualBooking}
+            onMoveBooking={moveBookingFromAdmin}
             fixedBookings={fixedBookings}
             onUpdateFixedStatus={updateFixedBookingStatus}
             onCancelFixedBooking={cancelFixedBooking}
