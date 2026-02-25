@@ -429,8 +429,6 @@ function AdminPage({
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Día / Fecha</th>
-                    <th>Cancha</th>
                     <th>Hora</th>
                     <th>Cliente</th>
                     <th>Estado</th>
@@ -442,84 +440,88 @@ function AdminPage({
                 <tbody>
                   {groupedAdminBookings.length === 0 ? (
                     <tr>
-                      <td colSpan={8}>No hay registros para los filtros seleccionados.</td>
+                      <td colSpan={6}>No hay registros para los filtros seleccionados.</td>
                     </tr>
                   ) : (
                     groupedAdminBookings.flatMap((group) =>
-                      group.rows.map((row, rowIndex) => {
-                        if (row.type === 'free') {
+                      [
+                        <tr key={`${group.key}-day`} className="group-day-header-row">
+                          <td colSpan={6}>📅 {group.dayName} · {group.date}</td>
+                        </tr>,
+                        <tr key={`${group.key}-court`} className="group-court-subheader-row">
+                          <td colSpan={6}>🏟️ {group.court.name}</td>
+                        </tr>,
+                        ...group.rows.map((row) => {
+                          if (row.type === 'free') {
+                            return (
+                              <tr key={`${group.key}-free-${row.hour}`} className="free-slot-row">
+                                <td data-label="Hora">{row.hour}:00</td>
+                                <td data-label="Cliente">-</td>
+                                <td data-label="Estado">Libre</td>
+                                <td data-label="WhatsApp">-</td>
+                                <td data-label="Confirmación">-</td>
+                                <td data-label="Acciones">
+                                  <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={() => {
+                                      if (!row.canManualReserve) return;
+                                      onPrefillManualBooking({ date: row.date, courtId: row.courtId, hour: row.hour });
+                                      setActiveAdminPanel('turnos-manual');
+                                    }}
+                                    disabled={!row.canManualReserve}
+                                  >
+                                    Reservar
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          const booking = row.booking;
+                          const confirmUrl = buildWhatsappConfirmUrl(booking, group.court.name);
                           return (
-                            <tr key={`${group.key}-free-${row.hour}`} className="free-slot-row">
-                              <td data-label="Día / Fecha">{group.dayName} · {group.date}</td>
-                              <td data-label="Cancha">{group.court.name}</td>
-                              <td data-label="Hora">{row.hour}:00</td>
-                              <td data-label="Cliente">-</td>
-                              <td data-label="Estado">Libre</td>
-                              <td data-label="WhatsApp">-</td>
-                              <td data-label="Confirmación">-</td>
+                            <tr key={booking.id}>
+                              <td data-label="Hora">{booking.hour}:00</td>
+                              <td data-label="Cliente">{booking.userName || '-'}</td>
+                              <td data-label="Estado">{booking.status || 'reservado'}</td>
+                              <td data-label="WhatsApp">
+                                {booking.userPhone ? (
+                                  <a className="btn-whatsapp" href={`https://wa.me/${booking.userPhone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
+                                    WhatsApp
+                                  </a>
+                                ) : '-'}
+                              </td>
+                              <td data-label="Confirmación">
+                                {booking.status === 'confirmado' ? (
+                                  <span className="confirm-check">✓ Confirmado</span>
+                                ) : confirmUrl ? (
+                                  <a className="btn-secondary btn-confirm" href={confirmUrl} target="_blank" rel="noreferrer">
+                                    Solicitar confirmación
+                                  </a>
+                                ) : '-'}
+                              </td>
                               <td data-label="Acciones">
-                                <button
-                                  type="button"
-                                  className="btn-secondary"
-                                  onClick={() => {
-                                    if (!row.canManualReserve) return;
-                                    onPrefillManualBooking({ date: row.date, courtId: row.courtId, hour: row.hour });
-                                    setActiveAdminPanel('turnos-manual');
-                                  }}
-                                  disabled={!row.canManualReserve}
-                                >
-                                  Reservar
-                                </button>
+                                <div className="admin-actions-cell">
+                                  <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={() => {
+                                      setMovingBookingId(booking.id);
+                                      setMoveDraft({ date: booking.date || moveDates[0] || today, courtId: booking.courtId || courts[0]?.id || '', hour: String(booking.hour ?? '') });
+                                    }}
+                                  >
+                                    Modificar / mover
+                                  </button>
+                                  <button type="button" className="btn-cancel" onClick={() => onCancelBooking(booking.id)}>
+                                    Cancelar
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
-                        }
-
-                        const booking = row.booking;
-                        const confirmUrl = buildWhatsappConfirmUrl(booking, group.court.name);
-                        return (
-                          <tr key={booking.id}>
-                            <td data-label="Día / Fecha">{rowIndex === 0 ? `${group.dayName} · ${group.date}` : ''}</td>
-                            <td data-label="Cancha">{group.court.name}</td>
-                            <td data-label="Hora">{booking.hour}:00</td>
-                            <td data-label="Cliente">{booking.userName || '-'}</td>
-                            <td data-label="Estado">{booking.status || 'reservado'}</td>
-                            <td data-label="WhatsApp">
-                              {booking.userPhone ? (
-                                <a className="btn-whatsapp" href={`https://wa.me/${booking.userPhone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
-                                  WhatsApp
-                                </a>
-                              ) : '-'}
-                            </td>
-                            <td data-label="Confirmación">
-                              {booking.status === 'confirmado' ? (
-                                <span className="confirm-check">✓ Confirmado</span>
-                              ) : confirmUrl ? (
-                                <a className="btn-secondary btn-confirm" href={confirmUrl} target="_blank" rel="noreferrer">
-                                  Solicitar confirmación
-                                </a>
-                              ) : '-'}
-                            </td>
-                            <td data-label="Acciones">
-                              <div className="admin-actions-cell">
-                                <button
-                                  type="button"
-                                  className="btn-secondary"
-                                  onClick={() => {
-                                    setMovingBookingId(booking.id);
-                                    setMoveDraft({ date: booking.date || moveDates[0] || today, courtId: booking.courtId || courts[0]?.id || '', hour: String(booking.hour ?? '') });
-                                  }}
-                                >
-                                  Modificar / mover
-                                </button>
-                                <button type="button" className="btn-cancel" onClick={() => onCancelBooking(booking.id)}>
-                                  Cancelar
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
+                        })
+                      ]
                     )
                   )}
                 </tbody>
