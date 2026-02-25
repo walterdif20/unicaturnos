@@ -480,6 +480,29 @@ select {
   gap: 0.3rem;
 }
 
+.admin-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+.admin-actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.free-slot-row {
+  background: #0b1f13;
+}
+
 .btn-whatsapp {
   display: inline-block;
   border: 1px solid #166534;
