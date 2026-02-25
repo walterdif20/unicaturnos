@@ -23,6 +23,29 @@ body {
   padding: 1.2rem;
 }
 
+
+.auth-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid #334155;
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.92);
+  padding: 0.7rem 0.85rem;
+}
+
+.auth-topbar-status {
+  color: #dbeafe;
+}
+
+.auth-topbar-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .hero {
   display: flex;
   gap: 1rem;
@@ -497,7 +520,8 @@ li {
 
   .landing-topbar,
   .admin-court-header,
-  .inline-form {
+  .inline-form,
+  .auth-topbar {
     flex-direction: column;
     align-items: stretch;
   }
@@ -515,6 +539,14 @@ li {
   .hero {
     flex-direction: column;
     text-align: center;
+  }
+
+  .auth-topbar-actions {
+    width: 100%;
+  }
+
+  .auth-topbar-actions button {
+    flex: 1;
   }
 
   .main-nav {
