@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { DEFAULT_DAYS, DEFAULT_SCHEDULE } from '../constants';
-import { toLocalDate } from '../utils/date';
+import { isPastSlotInArgentina, toLocalDate } from '../utils/date';
 import FootballRaffleScene from '../components/FootballRaffleScene';
 
 function AdminPage({
@@ -119,8 +119,15 @@ function AdminPage({
             acc.push({ type: 'reserved', booking, hour });
             return acc;
           }
-          if (showFreeSlots) {
-            acc.push({ type: 'free', date, courtId: court.id, courtName: court.name, hour });
+          if (showFreeSlots && !isPastSlotInArgentina(date, hour)) {
+            acc.push({
+              type: 'free',
+              date,
+              courtId: court.id,
+              courtName: court.name,
+              hour,
+              canManualReserve: manualBookableDates.includes(date)
+            });
           }
           return acc;
         }, []);
@@ -138,7 +145,7 @@ function AdminPage({
     });
 
     return groups;
-  }, [visibleDates, selectedCourtFilter, courts, schedules, bookingsBySlot, showFreeSlots]);
+  }, [visibleDates, selectedCourtFilter, courts, schedules, bookingsBySlot, showFreeSlots, manualBookableDates]);
 
   const moveDates = useMemo(() => {
     const allDates = [...new Set([...visibleDates, ...manualBookableDates])].sort();
@@ -190,6 +197,13 @@ function AdminPage({
           onClick={() => setActiveAdminPanel('turnos')}
         >
           Turnos
+        </button>
+        <button
+          type="button"
+          className={activeAdminPanel === 'turnos-manual' ? 'nav-pill nav-pill-active' : 'nav-pill'}
+          onClick={() => setActiveAdminPanel('turnos-manual')}
+        >
+          Cargar turno manual
         </button>
         <button
           type="button"
@@ -306,100 +320,6 @@ function AdminPage({
             <p className="admin-panel-subtitle">Visualización agrupada por día/cancha, filtros avanzados y acciones rápidas.</p>
 
             <section className="manual-booking-card">
-              <h4>Cargar turno manual</h4>
-              <p className="admin-panel-subtitle">
-                Usá esta herramienta para reservar un turno a nombre de una persona sin cuenta.
-              </p>
-
-              <form className="manual-booking-form" onSubmit={onCreateManualBooking}>
-                <label>
-                  Fecha
-                  <select
-                    value={manualBookingData.date}
-                    onChange={(event) => onChangeManualBookingField('date', event.target.value)}
-                    disabled={manualBookableDates.length === 0}
-                  >
-                    {manualBookableDates.length === 0 && <option value="">Sin fechas disponibles</option>}
-                    {manualBookableDates.map((date) => (
-                      <option key={date} value={date}>
-                        {date}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Cancha
-                  <select
-                    value={manualBookingData.courtId}
-                    onChange={(event) => onChangeManualBookingField('courtId', event.target.value)}
-                    disabled={manualBookableCourts.length === 0}
-                  >
-                    {manualBookableCourts.length === 0 && <option value="">Sin canchas disponibles</option>}
-                    {manualBookableCourts.map((court) => (
-                      <option key={court.id} value={court.id}>
-                        {court.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Horario
-                  <select
-                    value={manualBookingData.hour}
-                    onChange={(event) => onChangeManualBookingField('hour', event.target.value)}
-                    disabled={manualBookableHours.length === 0}
-                  >
-                    {manualBookableHours.length === 0 && <option value="">Sin horarios disponibles</option>}
-                    {manualBookableHours.map((hour) => (
-                      <option key={`${manualBookingData.courtId}-${hour}`} value={hour}>
-                        {hour}:00
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Nombre
-                  <input
-                    type="text"
-                    value={manualBookingData.firstName}
-                    onChange={(event) => onChangeManualBookingField('firstName', event.target.value)}
-                    placeholder="Nombre"
-                  />
-                </label>
-
-                <label>
-                  Apellido
-                  <input
-                    type="text"
-                    value={manualBookingData.lastName}
-                    onChange={(event) => onChangeManualBookingField('lastName', event.target.value)}
-                    placeholder="Apellido"
-                  />
-                </label>
-
-                <label>
-                  Teléfono
-                  <input
-                    type="tel"
-                    value={manualBookingData.phone}
-                    onChange={(event) => onChangeManualBookingField('phone', event.target.value)}
-                    placeholder="+54 11 1234-5678"
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={manualBookableDates.length === 0 || manualBookableCourts.length === 0 || manualBookableHours.length === 0}
-                >
-                  Cargar turno manual
-                </button>
-              </form>
-            </section>
-
-            <section className="manual-booking-card">
               <h4>Filtros de turnos</h4>
               <div className="day-filter-buttons" role="group" aria-label="Filtro por período">
                 <button type="button" className={dateFilterType === 'today' ? 'nav-pill nav-pill-active' : 'nav-pill'} onClick={() => setDateFilterType('today')}>
@@ -509,8 +429,6 @@ function AdminPage({
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Día / Fecha</th>
-                    <th>Cancha</th>
                     <th>Hora</th>
                     <th>Cliente</th>
                     <th>Estado</th>
@@ -522,84 +440,191 @@ function AdminPage({
                 <tbody>
                   {groupedAdminBookings.length === 0 ? (
                     <tr>
-                      <td colSpan={8}>No hay registros para los filtros seleccionados.</td>
+                      <td colSpan={6}>No hay registros para los filtros seleccionados.</td>
                     </tr>
                   ) : (
                     groupedAdminBookings.flatMap((group) =>
-                      group.rows.map((row, rowIndex) => {
-                        if (row.type === 'free') {
+                      [
+                        <tr key={`${group.key}-day`} className="group-day-header-row">
+                          <td colSpan={6}>📅 {group.dayName} · {group.date}</td>
+                        </tr>,
+                        <tr key={`${group.key}-court`} className="group-court-subheader-row">
+                          <td colSpan={6}>🏟️ {group.court.name}</td>
+                        </tr>,
+                        ...group.rows.map((row) => {
+                          if (row.type === 'free') {
+                            return (
+                              <tr key={`${group.key}-free-${row.hour}`} className="free-slot-row">
+                                <td data-label="Hora">{row.hour}:00</td>
+                                <td data-label="Cliente">-</td>
+                                <td data-label="Estado">Libre</td>
+                                <td data-label="WhatsApp">-</td>
+                                <td data-label="Confirmación">-</td>
+                                <td data-label="Acciones">
+                                  <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={() => {
+                                      if (!row.canManualReserve) return;
+                                      onPrefillManualBooking({ date: row.date, courtId: row.courtId, hour: row.hour });
+                                      setActiveAdminPanel('turnos-manual');
+                                    }}
+                                    disabled={!row.canManualReserve}
+                                  >
+                                    Reservar
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          const booking = row.booking;
+                          const confirmUrl = buildWhatsappConfirmUrl(booking, group.court.name);
                           return (
-                            <tr key={`${group.key}-free-${row.hour}`} className="free-slot-row">
-                              <td data-label="Día / Fecha">{group.dayName} · {group.date}</td>
-                              <td data-label="Cancha">{group.court.name}</td>
-                              <td data-label="Hora">{row.hour}:00</td>
-                              <td data-label="Cliente">-</td>
-                              <td data-label="Estado">Libre</td>
-                              <td data-label="WhatsApp">-</td>
-                              <td data-label="Confirmación">-</td>
+                            <tr key={booking.id}>
+                              <td data-label="Hora">{booking.hour}:00</td>
+                              <td data-label="Cliente">{booking.userName || '-'}</td>
+                              <td data-label="Estado">{booking.status || 'reservado'}</td>
+                              <td data-label="WhatsApp">
+                                {booking.userPhone ? (
+                                  <a className="btn-whatsapp" href={`https://wa.me/${booking.userPhone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
+                                    WhatsApp
+                                  </a>
+                                ) : '-'}
+                              </td>
+                              <td data-label="Confirmación">
+                                {booking.status === 'confirmado' ? (
+                                  <span className="confirm-check">✓ Confirmado</span>
+                                ) : confirmUrl ? (
+                                  <a className="btn-secondary btn-confirm" href={confirmUrl} target="_blank" rel="noreferrer">
+                                    Solicitar confirmación
+                                  </a>
+                                ) : '-'}
+                              </td>
                               <td data-label="Acciones">
-                                <button
-                                  type="button"
-                                  className="btn-secondary"
-                                  onClick={() => onPrefillManualBooking({ date: row.date, courtId: row.courtId, hour: row.hour })}
-                                >
-                                  Reservar
-                                </button>
+                                <div className="admin-actions-cell">
+                                  <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={() => {
+                                      setMovingBookingId(booking.id);
+                                      setMoveDraft({ date: booking.date || moveDates[0] || today, courtId: booking.courtId || courts[0]?.id || '', hour: String(booking.hour ?? '') });
+                                    }}
+                                  >
+                                    Modificar / mover
+                                  </button>
+                                  <button type="button" className="btn-cancel" onClick={() => onCancelBooking(booking.id)}>
+                                    Cancelar
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
-                        }
-
-                        const booking = row.booking;
-                        const confirmUrl = buildWhatsappConfirmUrl(booking, group.court.name);
-                        return (
-                          <tr key={booking.id}>
-                            <td data-label="Día / Fecha">{rowIndex === 0 ? `${group.dayName} · ${group.date}` : ''}</td>
-                            <td data-label="Cancha">{group.court.name}</td>
-                            <td data-label="Hora">{booking.hour}:00</td>
-                            <td data-label="Cliente">{booking.userName || '-'}</td>
-                            <td data-label="Estado">{booking.status || 'reservado'}</td>
-                            <td data-label="WhatsApp">
-                              {booking.userPhone ? (
-                                <a className="btn-whatsapp" href={`https://wa.me/${booking.userPhone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
-                                  WhatsApp
-                                </a>
-                              ) : '-'}
-                            </td>
-                            <td data-label="Confirmación">
-                              {booking.status === 'confirmado' ? (
-                                <span className="confirm-check">✓ Confirmado</span>
-                              ) : confirmUrl ? (
-                                <a className="btn-secondary btn-confirm" href={confirmUrl} target="_blank" rel="noreferrer">
-                                  Solicitar confirmación
-                                </a>
-                              ) : '-'}
-                            </td>
-                            <td data-label="Acciones">
-                              <div className="admin-actions-cell">
-                                <button
-                                  type="button"
-                                  className="btn-secondary"
-                                  onClick={() => {
-                                    setMovingBookingId(booking.id);
-                                    setMoveDraft({ date: booking.date || moveDates[0] || today, courtId: booking.courtId || courts[0]?.id || '', hour: String(booking.hour ?? '') });
-                                  }}
-                                >
-                                  Modificar / mover
-                                </button>
-                                <button type="button" className="btn-cancel" onClick={() => onCancelBooking(booking.id)}>
-                                  Cancelar
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
+                        })
+                      ]
                     )
                   )}
                 </tbody>
               </table>
             </div>
+          </article>
+        )}
+
+        {activeAdminPanel === 'turnos-manual' && (
+          <article className="admin-panel">
+            <h3>Cargar turno manual</h3>
+            <p className="admin-panel-subtitle">
+              Usá esta herramienta para reservar un turno a nombre de una persona sin cuenta.
+            </p>
+
+            <section className="manual-booking-card">
+              <form className="manual-booking-form" onSubmit={onCreateManualBooking}>
+                <label>
+                  Fecha
+                  <select
+                    value={manualBookingData.date}
+                    onChange={(event) => onChangeManualBookingField('date', event.target.value)}
+                    disabled={manualBookableDates.length === 0}
+                  >
+                    {manualBookableDates.length === 0 && <option value="">Sin fechas disponibles</option>}
+                    {manualBookableDates.map((date) => (
+                      <option key={date} value={date}>
+                        {date}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Cancha
+                  <select
+                    value={manualBookingData.courtId}
+                    onChange={(event) => onChangeManualBookingField('courtId', event.target.value)}
+                    disabled={manualBookableCourts.length === 0}
+                  >
+                    {manualBookableCourts.length === 0 && <option value="">Sin canchas disponibles</option>}
+                    {manualBookableCourts.map((court) => (
+                      <option key={court.id} value={court.id}>
+                        {court.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Horario
+                  <select
+                    value={manualBookingData.hour}
+                    onChange={(event) => onChangeManualBookingField('hour', event.target.value)}
+                    disabled={manualBookableHours.length === 0}
+                  >
+                    {manualBookableHours.length === 0 && <option value="">Sin horarios disponibles</option>}
+                    {manualBookableHours.map((hour) => (
+                      <option key={`${manualBookingData.courtId}-${hour}`} value={hour}>
+                        {hour}:00
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Nombre
+                  <input
+                    type="text"
+                    value={manualBookingData.firstName}
+                    onChange={(event) => onChangeManualBookingField('firstName', event.target.value)}
+                    placeholder="Nombre"
+                  />
+                </label>
+
+                <label>
+                  Apellido
+                  <input
+                    type="text"
+                    value={manualBookingData.lastName}
+                    onChange={(event) => onChangeManualBookingField('lastName', event.target.value)}
+                    placeholder="Apellido"
+                  />
+                </label>
+
+                <label>
+                  Teléfono
+                  <input
+                    type="tel"
+                    value={manualBookingData.phone}
+                    onChange={(event) => onChangeManualBookingField('phone', event.target.value)}
+                    placeholder="+54 11 1234-5678"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={manualBookableDates.length === 0 || manualBookableCourts.length === 0 || manualBookableHours.length === 0}
+                >
+                  Cargar turno manual
+                </button>
+              </form>
+            </section>
           </article>
         )}
 

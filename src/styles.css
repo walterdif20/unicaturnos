@@ -503,6 +503,17 @@ select {
   background: #0b1f13;
 }
 
+.group-day-header-row td {
+  background: #1e293b;
+  font-weight: 800;
+}
+
+.group-court-subheader-row td {
+  background: #0f172a;
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
 .btn-whatsapp {
   display: inline-block;
   border: 1px solid #166534;
