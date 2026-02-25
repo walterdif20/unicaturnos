@@ -1096,6 +1096,34 @@ function App() {
 
   return (
     <div className="app">
+      <section className="auth-topbar" aria-label="Accesos de cuenta">
+        <div className="auth-topbar-status">
+          {user ? (
+            <p>
+              Sesión iniciada como{' '}
+              <strong>{`${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || user.email}</strong>
+            </p>
+          ) : (
+            <p>No iniciaste sesión.</p>
+          )}
+        </div>
+        <div className="auth-topbar-actions">
+          {!user ? (
+            <>
+              <button type="button" className="btn-secondary" onClick={() => goToAuth('login')}>
+                Login
+              </button>
+              <button type="button" onClick={() => goToAuth('register')}>
+                Registrarme
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn-secondary" onClick={logoutUser}>
+              Cerrar sesión
+            </button>
+          )}
+        </div>
+      </section>
       <Header />
       <MainNav activeSection={activeSection} onChangeSection={setActiveSection} canAccessAdmin={canAccessAdmin} />
 
