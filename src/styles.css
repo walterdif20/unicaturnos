@@ -94,6 +94,35 @@ p {
   flex-wrap: wrap;
 }
 
+.section-guide {
+  margin: 0.2rem 0 1rem;
+  border: 1px solid #334155;
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.7);
+  padding: 0.65rem 0.8rem;
+  color: #cbd5e1;
+}
+
+.section-guide-title {
+  font-weight: 700;
+  color: #bfdbfe;
+}
+
+.nav-pill {
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+}
+
+.nav-pill-label {
+  font-weight: 700;
+}
+
+.nav-pill-hint {
+  font-size: 0.78rem;
+  opacity: 0.9;
+}
+
 .nav-pill,
 button,
 input {
@@ -550,12 +579,16 @@ li {
   }
 
   .main-nav {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+    scrollbar-width: thin;
   }
 
   .main-nav .nav-pill {
-    width: 100%;
+    min-width: 190px;
+    flex: 0 0 auto;
   }
 
   .slot-grid {
