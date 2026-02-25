@@ -42,7 +42,7 @@ function LandingPage({
       </div>
 
       <div className="week-nav">
-        <button type="button" className="btn-secondary" onClick={() => onChangeDate(upcomingDates[selectedDateIndex - 1])} disabled={!canGoPrev}>
+        <button type="button" className="btn-secondary week-nav-step" onClick={() => onChangeDate(upcomingDates[selectedDateIndex - 1])} disabled={!canGoPrev}>
           ← Día anterior
         </button>
         <div className="week-chips" role="tablist" aria-label="Próximos siete días">
@@ -59,7 +59,7 @@ function LandingPage({
             </button>
           ))}
         </div>
-        <button type="button" className="btn-secondary" onClick={() => onChangeDate(upcomingDates[selectedDateIndex + 1])} disabled={!canGoNext}>
+        <button type="button" className="btn-secondary week-nav-step" onClick={() => onChangeDate(upcomingDates[selectedDateIndex + 1])} disabled={!canGoNext}>
           Día siguiente →
         </button>
       </div>

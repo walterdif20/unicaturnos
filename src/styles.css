@@ -208,6 +208,11 @@ main {
   gap: 0.65rem;
 }
 
+.week-nav-step {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.88rem;
+}
+
 .week-chips {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
