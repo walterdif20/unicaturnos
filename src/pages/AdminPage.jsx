@@ -31,6 +31,8 @@ function AdminPage({
   adminUsers,
   onMakeAdmin,
   onRemoveAdmin,
+  onBlockUser,
+  onUnblockUser,
   manualBookingData,
   onChangeManualBookingField,
   onCreateManualBooking,
@@ -738,10 +740,22 @@ function AdminPage({
                   <p>
                     Usuario seleccionado: <strong>{selectedRoleUser.email}</strong>
                   </p>
+                  <p>
+                    Estado: <strong>{selectedRoleUser.isBlocked ? 'Bloqueado' : 'Activo'}</strong>
+                  </p>
                   <div className="role-actions">
                     <button type="button" onClick={() => onMakeAdmin(selectedRoleUser.id)}>
                       Hacer administrador
                     </button>
+                    {selectedRoleUser.isBlocked ? (
+                      <button type="button" className="btn-secondary" onClick={() => onUnblockUser(selectedRoleUser.id)}>
+                        Desbloquear usuario
+                      </button>
+                    ) : (
+                      <button type="button" className="btn-cancel" onClick={() => onBlockUser(selectedRoleUser.id)}>
+                        Bloquear usuario
+                      </button>
+                    )}
                     <button type="button" className="btn-secondary" onClick={onClearRoleSelection}>
                       Limpiar selección
                     </button>
