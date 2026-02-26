@@ -1381,6 +1381,7 @@ function App() {
 
   return (
     <div className="app">
+      <MainNav activeSection={activeSection} onChangeSection={handleChangeSection} canAccessAdmin={canAccessAdmin} />
       <section className="auth-topbar" aria-label="Accesos de cuenta">
         <div className="auth-topbar-status">
           {user ? (
@@ -1410,7 +1411,6 @@ function App() {
         </div>
       </section>
       <Header />
-      <MainNav activeSection={activeSection} onChangeSection={handleChangeSection} canAccessAdmin={canAccessAdmin} />
 
       {activeSectionDetails ? (
         <section className="section-guide" aria-live="polite">
