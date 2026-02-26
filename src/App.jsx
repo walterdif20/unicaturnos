@@ -72,6 +72,7 @@ const parsePhone = (phone = '') => {
 };
 
 const isProfileComplete = (profile) => Boolean(profile?.firstName && profile?.phone);
+const isUserBlocked = (profile) => Boolean(profile?.isBlocked);
 
 const buildConfirmationToken = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -735,6 +736,11 @@ function App() {
       return;
     }
 
+    if (isUserBlocked(profile)) {
+      setStatusMessage('Tu usuario está bloqueado para reservar turnos. Contactá a administración.');
+      return;
+    }
+
     const slotKey = `${courtId}-${hour}`;
     if (bookingsByCourtHour[slotKey]) return;
 
@@ -976,6 +982,26 @@ function App() {
     setStatusMessage('Usuario actualizado como administrador.');
     setSelectedRoleUser(null);
     setRoleSearch('');
+    await loadCoreData(selectedDate);
+  };
+
+  const blockUser = async (uid) => {
+    if (!requestConfirmation('¿Estás seguro de que querés bloquear a este usuario?')) return;
+    await setDoc(doc(db, 'users', uid), { isBlocked: true }, { merge: true });
+    setStatusMessage('Usuario bloqueado para reservar turnos.');
+    if (selectedRoleUser?.id === uid) {
+      setSelectedRoleUser((prev) => (prev ? { ...prev, isBlocked: true } : prev));
+    }
+    await loadCoreData(selectedDate);
+  };
+
+  const unblockUser = async (uid) => {
+    if (!requestConfirmation('¿Estás seguro de que querés desbloquear a este usuario?')) return;
+    await setDoc(doc(db, 'users', uid), { isBlocked: false }, { merge: true });
+    setStatusMessage('Usuario desbloqueado.');
+    if (selectedRoleUser?.id === uid) {
+      setSelectedRoleUser((prev) => (prev ? { ...prev, isBlocked: false } : prev));
+    }
     await loadCoreData(selectedDate);
   };
 
@@ -1500,6 +1526,8 @@ function App() {
             adminUsers={adminUsers}
             onMakeAdmin={makeAdministrator}
             onRemoveAdmin={removeAdministrator}
+            onBlockUser={blockUser}
+            onUnblockUser={unblockUser}
             manualBookingData={manualBookingData}
             onChangeManualBookingField={(field, value) =>
               setManualBookingData((prev) => ({ ...prev, [field]: value }))
