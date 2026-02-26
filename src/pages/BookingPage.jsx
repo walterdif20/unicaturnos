@@ -135,32 +135,45 @@ function BookingPage({
         <button
           type="button"
           className="btn-secondary week-nav-step"
+          aria-label="Ir al día anterior"
           onClick={() => onChangeDate(upcomingDates[selectedDateIndex - 1])}
           disabled={!canGoPrev}
         >
-          ← Día anterior
+          ←
         </button>
         <div className="week-chips" role="tablist" aria-label="Próximos siete días">
           {upcomingDates.map((date) => (
-            <button
-              key={date}
-              type="button"
-              role="tab"
-              aria-selected={date === selectedDate}
-              className={date === selectedDate ? 'day-chip day-chip-active' : 'day-chip'}
-              onClick={() => onChangeDate(date)}
-            >
-              {DEFAULT_DAYS[new Date(`${date}T00:00:00`).getDay()]} {date.slice(8)}
-            </button>
+            (() => {
+              const dayDate = new Date(`${date}T00:00:00`);
+              const monthLabel = dayDate
+                .toLocaleDateString('es-AR', { month: 'short' })
+                .replace('.', '')
+                .slice(0, 3);
+
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  role="tab"
+                  aria-selected={date === selectedDate}
+                  className={date === selectedDate ? 'day-chip day-chip-active' : 'day-chip'}
+                  onClick={() => onChangeDate(date)}
+                >
+                  <span className="day-chip-weekday">{DEFAULT_DAYS[dayDate.getDay()].slice(0, 3)}</span>
+                  <span className="day-chip-date">{`${date.slice(8)} ${monthLabel}`}</span>
+                </button>
+              );
+            })()
           ))}
         </div>
         <button
           type="button"
           className="btn-secondary week-nav-step"
+          aria-label="Ir al día siguiente"
           onClick={() => onChangeDate(upcomingDates[selectedDateIndex + 1])}
           disabled={!canGoNext}
         >
-          Día siguiente →
+          →
         </button>
       </div>
 
