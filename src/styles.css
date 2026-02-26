@@ -157,6 +157,76 @@ button:hover {
   padding: 1rem;
 }
 
+.home-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.home-hero {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.home-book-btn {
+  width: fit-content;
+}
+
+.info-carousel {
+  border: 1px solid #334155;
+  border-radius: 0.9rem;
+  background: #0b1220;
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.info-block {
+  display: none;
+  gap: 0.55rem;
+}
+
+.info-block-active {
+  display: grid;
+}
+
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.carousel-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  padding: 0;
+  border: 1px solid #64748b;
+  background: #1e293b;
+}
+
+.carousel-dot-active {
+  border-color: #38bdf8;
+  background: #38bdf8;
+}
+
+.home-footer {
+  color: #bfdbfe;
+}
+
+.home-photo-block {
+  margin: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.home-photo {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: 0.9rem;
+  border: 1px solid #334155;
+}
+
 main {
   display: grid;
   gap: 1rem;

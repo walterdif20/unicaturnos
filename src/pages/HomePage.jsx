@@ -1,6 +1,49 @@
+import { useEffect, useMemo, useState } from 'react';
 import complejo from '../../imagendelcomplejo.jpg';
 
 function HomePage({ onGoToBookings }) {
+  const infoSlides = useMemo(
+    () => [
+      {
+        title: '💰 Valor del turno: $58.800 (fijo)',
+        description: '👉 Se divide entre todos los jugadores:',
+        items: ['🟢 7 vs 7 = $4200 por persona', '🔵 6 vs 6 = $4900 por persona', 'Y así sucesivamente…']
+      },
+      {
+        title: '📲 Reservas y confirmación',
+        items: [
+          'Reservas únicamente por WhatsApp, así queda todo registrado.',
+          '📩 El mismo día del turno, entre las 10:00 y 12:00 hs, te enviamos un mensaje de confirmación.',
+          '⚠️ Si no lo recibís, ¡por favor comunicate con nosotros!'
+        ]
+      },
+      {
+        title: '👤 Persona responsable del turno',
+        description: 'El turno se guarda a nombre de una persona responsable, quien se encargará de:',
+        items: ['✔️ Confirmar el turno', '✔️ Abonar el total', '✔️ Entregar las pecheras al finalizar']
+      },
+      {
+        title: '¿Cómo se paga el turno?',
+        items: [
+          'El dueño del turno es quien junta el dinero del equipo.',
+          'Efectivo: todos le pagan a una sola persona.',
+          'Transferencia: todos transfieren a una misma cuenta, y esa cuenta es la única que transfiere a La Única Quequén.',
+          '⚠️ Importante: para evitar confusiones, no se reciben pagos individuales.'
+        ]
+      }
+    ],
+    []
+  );
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    const carouselInterval = window.setInterval(() => {
+      setActiveSlide((current) => (current + 1) % infoSlides.length);
+    }, 5000);
+
+    return () => window.clearInterval(carouselInterval);
+  }, [infoSlides.length]);
+
   return (
     <section className="card home-card">
       <div className="home-hero">
@@ -13,49 +56,33 @@ function HomePage({ onGoToBookings }) {
         </button>
       </div>
 
-      <article className="info-block">
-        <h3>💰 Valor del turno: $58.800 (fijo)</h3>
-        <p>👉 Se divide entre todos los jugadores:</p>
-        <ul>
-          <li>🟢 7 vs 7 = $4200 por persona</li>
-          <li>🔵 6 vs 6 = $4900 por persona</li>
-          <li>Y así sucesivamente…</li>
-        </ul>
-      </article>
+      <section className="info-carousel" aria-label="Información importante">
+        {infoSlides.map((slide, index) => (
+          <article key={slide.title} className={index === activeSlide ? 'info-block info-block-active' : 'info-block'} aria-hidden={index !== activeSlide}>
+            <h3>{slide.title}</h3>
+            {slide.description && <p>{slide.description}</p>}
+            <ul>
+              {slide.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
 
-      <article className="info-block">
-        <h3>📲 Reservas y confirmación</h3>
-        <ul>
-          <li>Reservas únicamente por WhatsApp, así queda todo registrado.</li>
-          <li>📩 El mismo día del turno, entre las 10:00 y 12:00 hs, te enviamos un mensaje de confirmación.</li>
-          <li>⚠️ Si no lo recibís, ¡por favor comunicate con nosotros!</li>
-        </ul>
-      </article>
-
-      <article className="info-block">
-        <h3>👤 Persona responsable del turno</h3>
-        <p>El turno se guarda a nombre de una persona responsable, quien se encargará de:</p>
-        <ul>
-          <li>✔️ Confirmar el turno</li>
-          <li>✔️ Abonar el total</li>
-          <li>✔️ Entregar las pecheras al finalizar</li>
-        </ul>
-      </article>
-
-      <article className="info-block">
-        <h3>¿Cómo se paga el turno?</h3>
-        <ul>
-          <li>El dueño del turno es quien junta el dinero del equipo.</li>
-          <li>
-            <strong>Efectivo:</strong> todos le pagan a una sola persona.
-          </li>
-          <li>
-            <strong>Transferencia:</strong> todos transfieren a una misma cuenta, y esa cuenta es la única que transfiere a La
-            Única Quequén.
-          </li>
-          <li>⚠️ Importante: para evitar confusiones, no se reciben pagos individuales.</li>
-        </ul>
-      </article>
+        <div className="carousel-dots" role="tablist" aria-label="Secciones de información">
+          {infoSlides.map((slide, index) => (
+            <button
+              key={slide.title}
+              type="button"
+              role="tab"
+              aria-label={`Ir a: ${slide.title}`}
+              aria-selected={index === activeSlide}
+              className={index === activeSlide ? 'carousel-dot carousel-dot-active' : 'carousel-dot'}
+              onClick={() => setActiveSlide(index)}
+            />
+          ))}
+        </div>
+      </section>
 
       <p className="home-footer">¡Gracias por elegirnos y que disfruten del partido! 🥅🔥</p>
 
