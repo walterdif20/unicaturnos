@@ -53,7 +53,9 @@ function BookingPage({
   onGoRegister,
   bookingInProgress
 }) {
+  const INITIAL_VISIBLE_SLOTS = 5;
   const [countdownNow, setCountdownNow] = useState(() => Date.now());
+  const [visibleSlotsByCourt, setVisibleSlotsByCourt] = useState({});
   const selectedDateIndex = upcomingDates.indexOf(selectedDate);
   const canGoPrev = selectedDateIndex > 0;
   const canGoNext = selectedDateIndex < upcomingDates.length - 1;
@@ -69,6 +71,10 @@ function BookingPage({
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    setVisibleSlotsByCourt({});
+  }, [selectedDate]);
 
   const nextBookingCountdown = useMemo(() => getNextBookingCountdown(myBookings), [myBookings, countdownNow]);
 
@@ -166,7 +172,7 @@ function BookingPage({
             <h3>{court.name}</h3>
             <div className="slot-grid">
               {court.hours.length === 0 && <p>Sin horarios configurados para {DEFAULT_DAYS[dayIndex]}.</p>}
-              {court.hours.map((hour) => {
+              {court.hours.slice(0, visibleSlotsByCourt[court.id] ?? INITIAL_VISIBLE_SLOTS).map((hour) => {
                 const slotKey = `${court.id}-${hour}`;
                 const booked = bookingsByCourtHour[slotKey];
                 return (
@@ -178,10 +184,25 @@ function BookingPage({
                     onClick={() => onBookSlot(court.id, hour)}
                   >
                     {hour}:00 {booked ? '· Reservado' : '· Disponible'}
+                    {booked?.userName ? ` · ${booked.userName}` : ''}
                   </button>
                 );
               })}
             </div>
+            {court.hours.length > (visibleSlotsByCourt[court.id] ?? INITIAL_VISIBLE_SLOTS) && (
+              <button
+                type="button"
+                className="btn-secondary slot-more-btn"
+                onClick={() => {
+                  setVisibleSlotsByCourt((current) => ({
+                    ...current,
+                    [court.id]: (current[court.id] ?? INITIAL_VISIBLE_SLOTS) + INITIAL_VISIBLE_SLOTS
+                  }));
+                }}
+              >
+                Ver más turnos
+              </button>
+            )}
           </article>
         ))}
 
