@@ -203,6 +203,21 @@ function App() {
   const [raffleAnimating, setRaffleAnimating] = useState(false);
   const canAccessAdmin = Boolean(profile?.isAdmin);
 
+  const visibleMyBookings = useMemo(
+    () => myBookings.filter((booking) => !isPastSlotInArgentina(booking.date, booking.hour)),
+    [myBookings]
+  );
+
+  const visibleMyFixedBookings = useMemo(
+    () => fixedBookings.filter((entry) => entry.userId === user?.uid && entry.status !== 'cancelled'),
+    [fixedBookings, user?.uid]
+  );
+
+  const visibleAdminFixedBookings = useMemo(
+    () => fixedBookings.filter((entry) => entry.status !== 'cancelled'),
+    [fixedBookings]
+  );
+
   const requestConfirmation = (message) => {
     if (typeof window === 'undefined') return true;
     return window.confirm(message);
@@ -1453,8 +1468,8 @@ function App() {
         {!loading && activeSection === 'mis-reservas' && (
           <MyBookingsPage
             user={user}
-            bookings={myBookings}
-            fixedBookings={fixedBookings.filter((entry) => entry.userId === user?.uid)}
+            bookings={visibleMyBookings}
+            fixedBookings={visibleMyFixedBookings}
             courts={courts}
             onCancelBooking={cancelBooking}
             onCreateFixedBooking={createFixedBookingFromBooking}
@@ -1538,7 +1553,7 @@ function App() {
             manualBookableHours={manualBookingAvailability.hoursByCourt[manualBookingData.courtId] || []}
             onPrefillManualBooking={prefillManualBooking}
             onMoveBooking={moveBookingFromAdmin}
-            fixedBookings={fixedBookings}
+            fixedBookings={visibleAdminFixedBookings}
             onUpdateFixedStatus={updateFixedBookingStatus}
             onCancelFixedBooking={cancelFixedBooking}
             raffleDraft={raffleDraft}
