@@ -89,9 +89,24 @@ p {
 
 .main-nav {
   margin: 1rem 0;
-  display: flex;
+  display: grid;
   gap: 0.6rem;
-  flex-wrap: wrap;
+}
+
+.menu-toggle {
+  justify-self: start;
+  background: #0f172a;
+  color: #dbeafe;
+  border-color: #334155;
+}
+
+.main-nav-items {
+  display: none;
+  gap: 0.6rem;
+}
+
+.main-nav-items-open {
+  display: grid;
 }
 
 .section-guide {
@@ -715,17 +730,16 @@ li {
     flex: 1;
   }
 
-  .main-nav {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 0.2rem;
-    scrollbar-width: thin;
+  .main-nav-items {
+    display: none;
+  }
+
+  .main-nav-items-open {
+    display: grid;
   }
 
   .main-nav .nav-pill {
-    min-width: 190px;
-    flex: 0 0 auto;
+    width: 100%;
   }
 
   .slot-grid {
