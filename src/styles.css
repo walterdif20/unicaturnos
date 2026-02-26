@@ -177,22 +177,46 @@ button:hover {
   background: #0b1220;
   padding: 0.85rem;
   display: grid;
-  gap: 0.8rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.carousel-viewport {
+  overflow: hidden;
+  width: 100%;
+}
+
+.carousel-track {
+  display: flex;
+  transition: transform 0.45s ease;
 }
 
 .info-block {
-  display: none;
+  min-width: 100%;
+  display: grid;
   gap: 0.55rem;
 }
 
-.info-block-active {
+.carousel-arrow {
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 999px;
+  padding: 0;
+  font-size: 1.35rem;
+  line-height: 1;
   display: grid;
+  place-items: center;
+  background: #1e293b;
+  color: #dbeafe;
+  border-color: #334155;
 }
 
 .carousel-dots {
   display: flex;
   justify-content: center;
   gap: 0.45rem;
+  grid-column: 1 / -1;
 }
 
 .carousel-dot {
@@ -706,6 +730,14 @@ li {
 
   .slot-grid {
     grid-template-columns: 1fr;
+  }
+
+  .info-carousel {
+    grid-template-columns: 1fr;
+  }
+
+  .carousel-arrow {
+    display: none;
   }
 }
 

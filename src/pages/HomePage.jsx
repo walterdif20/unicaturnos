@@ -34,6 +34,7 @@ function HomePage({ onGoToBookings }) {
     ],
     []
   );
+
   const [activeSlide, setActiveSlide] = useState(0);
 
   useEffect(() => {
@@ -43,6 +44,14 @@ function HomePage({ onGoToBookings }) {
 
     return () => window.clearInterval(carouselInterval);
   }, [infoSlides.length]);
+
+  const goToPrevSlide = () => {
+    setActiveSlide((current) => (current - 1 + infoSlides.length) % infoSlides.length);
+  };
+
+  const goToNextSlide = () => {
+    setActiveSlide((current) => (current + 1) % infoSlides.length);
+  };
 
   return (
     <section className="card home-card">
@@ -57,17 +66,29 @@ function HomePage({ onGoToBookings }) {
       </div>
 
       <section className="info-carousel" aria-label="Información importante">
-        {infoSlides.map((slide, index) => (
-          <article key={slide.title} className={index === activeSlide ? 'info-block info-block-active' : 'info-block'} aria-hidden={index !== activeSlide}>
-            <h3>{slide.title}</h3>
-            {slide.description && <p>{slide.description}</p>}
-            <ul>
-              {slide.items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </article>
-        ))}
+        <button type="button" className="carousel-arrow" aria-label="Ver información anterior" onClick={goToPrevSlide}>
+          ‹
+        </button>
+
+        <div className="carousel-viewport">
+          <div className="carousel-track" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
+            {infoSlides.map((slide) => (
+              <article key={slide.title} className="info-block">
+                <h3>{slide.title}</h3>
+                {slide.description && <p>{slide.description}</p>}
+                <ul>
+                  {slide.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <button type="button" className="carousel-arrow" aria-label="Ver siguiente información" onClick={goToNextSlide}>
+          ›
+        </button>
 
         <div className="carousel-dots" role="tablist" aria-label="Secciones de información">
           {infoSlides.map((slide, index) => (
