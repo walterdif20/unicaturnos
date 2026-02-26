@@ -15,6 +15,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   runTransaction,
   serverTimestamp,
@@ -208,6 +209,16 @@ function App() {
 
   const isValidFixedBookingId = (fixedBookingId) => typeof fixedBookingId === 'string' && fixedBookingId.trim().length > 0;
 
+  const mapBookings = (snapshot) =>
+    snapshot.docs
+      .map((booking) => ({ id: booking.id, ...booking.data() }))
+      .sort((a, b) => `${a.date || ''}-${a.hour || 0}`.localeCompare(`${b.date || ''}-${b.hour || 0}`));
+
+  const mapFixedBookings = (snapshot) =>
+    snapshot.docs
+      .map((item) => ({ id: item.id, ...item.data() }))
+      .sort((a, b) => `${a.weekday || 0}-${a.hour || 0}`.localeCompare(`${b.weekday || 0}-${b.hour || 0}`));
+
   const loadMyBookings = async (uid) => {
     if (!uid) {
       setMyBookings([]);
@@ -319,6 +330,144 @@ function App() {
 
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const unsubscribeCourts = onSnapshot(collection(db, 'courts'), (snapshot) => {
+      const courtsData = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      setCourts(courtsData);
+    });
+
+    const unsubscribeSchedules = onSnapshot(collection(db, 'schedules'), (snapshot) => {
+      const scheduleEntries = {};
+      snapshot.docs.forEach((scheduleDoc) => {
+        scheduleEntries[scheduleDoc.id] = scheduleDoc.data();
+      });
+      setSchedules((previous) => {
+        const mergedSchedules = { ...previous, ...scheduleEntries };
+        courts.forEach((court) => {
+          if (!mergedSchedules[court.id]) {
+            mergedSchedules[court.id] = DEFAULT_SCHEDULE;
+          }
+        });
+        return mergedSchedules;
+      });
+    });
+
+    const unsubscribeHolidays = onSnapshot(doc(db, 'settings', 'holidays'), (holidayDoc) => {
+      const holidayDates = holidayDoc.exists() ? holidayDoc.data().dates || [] : [];
+      setHolidays(holidayDates);
+    });
+
+    const unsubscribePricing = onSnapshot(doc(db, 'settings', 'pricing'), (pricingDoc) => {
+      const savedCourtPrice = pricingDoc.exists() ? parseCourtPrice(pricingDoc.data().courtPrice) : DEFAULT_COURT_PRICE;
+      setCourtPrice(savedCourtPrice);
+      setNewCourtPrice(String(savedCourtPrice));
+    });
+
+    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (usersSnapshot) => {
+      const usersData = usersSnapshot.docs
+        .map((userDoc) => ({ id: userDoc.id, ...userDoc.data() }))
+        .filter((entry) => entry.email)
+        .sort((a, b) => a.email.localeCompare(b.email));
+
+      setAllUsers(usersData);
+      setAdminUsers(usersData.filter((entry) => entry.isAdmin));
+    });
+
+    const unsubscribeRaffles = onSnapshot(collection(db, 'raffleHistory'), (rafflesSnapshot) => {
+      const rafflesData = rafflesSnapshot.docs
+        .map((raffleDoc) => ({ id: raffleDoc.id, ...raffleDoc.data() }))
+        .sort((a, b) => {
+          const aTime = a.createdAt?.seconds || 0;
+          const bTime = b.createdAt?.seconds || 0;
+          return bTime - aTime;
+        })
+        .slice(0, 12);
+      setRaffleWinners(rafflesData);
+    });
+
+    return () => {
+      unsubscribeCourts();
+      unsubscribeSchedules();
+      unsubscribeHolidays();
+      unsubscribePricing();
+      unsubscribeUsers();
+      unsubscribeRaffles();
+    };
+  }, []);
+
+  useEffect(() => {
+    setSchedules((previous) => {
+      const nextSchedules = { ...previous };
+      let hasChanges = false;
+
+      courts.forEach((court) => {
+        if (!nextSchedules[court.id]) {
+          nextSchedules[court.id] = DEFAULT_SCHEDULE;
+          hasChanges = true;
+        }
+      });
+
+      return hasChanges ? nextSchedules : previous;
+    });
+  }, [courts]);
+
+  useEffect(() => {
+    const unsubscribeDayBookings = onSnapshot(
+      query(collection(db, 'bookings'), where('date', '==', selectedDate)),
+      (bookingSnapshot) => {
+        const bookedMap = {};
+        bookingSnapshot.forEach((booking) => {
+          const data = booking.data();
+          bookedMap[`${data.courtId}-${data.hour}`] = { id: booking.id, ...data };
+        });
+        setBookingsByCourtHour(bookedMap);
+      }
+    );
+
+    return () => unsubscribeDayBookings();
+  }, [selectedDate]);
+
+  useEffect(() => {
+    const unsubscribeAdminBookings = onSnapshot(collection(db, 'bookings'), (allBookingsSnapshot) => {
+      setAdminBookings(mapBookings(allBookingsSnapshot));
+    });
+
+    return () => unsubscribeAdminBookings();
+  }, []);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setMyBookings([]);
+      return undefined;
+    }
+
+    const unsubscribeMyBookings = onSnapshot(
+      query(collection(db, 'bookings'), where('userId', '==', user.uid)),
+      (bookingsSnapshot) => {
+        setMyBookings(mapBookings(bookingsSnapshot));
+      }
+    );
+
+    return () => unsubscribeMyBookings();
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid && !canAccessAdmin) {
+      setFixedBookings([]);
+      return undefined;
+    }
+
+    const fixedBookingsQuery = canAccessAdmin
+      ? collection(db, 'fixedBookings')
+      : query(collection(db, 'fixedBookings'), where('userId', '==', user.uid));
+
+    const unsubscribeFixedBookings = onSnapshot(fixedBookingsQuery, (fixedBookingsSnapshot) => {
+      setFixedBookings(mapFixedBookings(fixedBookingsSnapshot));
+    });
+
+    return () => unsubscribeFixedBookings();
+  }, [canAccessAdmin, user?.uid]);
 
   const loadCoreData = async (date) => {
     const courtsSnapshot = await getDocs(collection(db, 'courts'));
