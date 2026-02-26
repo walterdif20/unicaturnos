@@ -94,15 +94,32 @@ p {
 }
 
 .menu-toggle {
-  justify-self: start;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.45rem;
   background: #0f172a;
   color: #dbeafe;
   border-color: #334155;
 }
 
+.menu-toggle-open {
+  background: #1e293b;
+  border-color: #475569;
+}
+
 .main-nav-items {
   display: none;
-  gap: 0.6rem;
+  gap: 0.5rem;
+  border: 1px solid #334155;
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.82);
+  padding: 0.55rem;
+}
+
+.main-nav-items .nav-pill {
+  width: 100%;
 }
 
 .main-nav-items-open {

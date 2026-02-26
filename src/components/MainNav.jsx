@@ -22,7 +22,7 @@ function MainNav({ activeSection, onChangeSection, canAccessAdmin = false }) {
     <nav className="main-nav" aria-label="Secciones principales">
       <button
         type="button"
-        className="menu-toggle"
+        className={isMenuOpen ? 'menu-toggle menu-toggle-open' : 'menu-toggle'}
         onClick={() => setIsMenuOpen((prev) => !prev)}
         aria-expanded={isMenuOpen}
         aria-controls="main-nav-items"
